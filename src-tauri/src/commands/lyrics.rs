@@ -158,7 +158,10 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album:
     //     );
     // }
 
-    let matched = matched.or_else(|| songs.iter().find(|song| {
+    let matched = matched.or_else(|| {
+        if album.is_empty() { return None; }
+        
+        songs.iter().find(|song| {
         album.is_empty() || song.get("album")
             .and_then(|a| a.get("name"))
             .and_then(|n| n.as_str())
@@ -168,7 +171,8 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album:
                 n_lower.contains(&album_lower) || album_lower.contains(&n_lower)
             })
             .unwrap_or(false)
-    }));
+        })
+    });
     let song = matched.or_else(|| songs.first())?;
     let song_id = song.get("id")?.as_u64()?;
 

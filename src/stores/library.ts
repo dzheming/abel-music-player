@@ -117,11 +117,11 @@ export const useLibraryStore = defineStore('library', () => {
             try {
                 const files: string[] = await invoke('scan_music_folder', { path: folder.path })
                 const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
-                const cachedPahts = new Set(cached.map(c => c.path))
-                const uncachedPahts = files.filter(f => !cachedPahts.has(f))
+                const cachedPaths = new Set(cached.map(c => c.path))
+                const uncachedPaths = files.filter(f => !cachedPaths.has(f))
 
-                if (uncachedPahts.length > 0) {
-                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { pahts: uncachedPahts })
+                if (uncachedPaths.length > 0) {
+                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { Paths: uncachedPaths })
                     const cacheData = metadataList.map(m => ({
                         path: m.path,
                         file_name: m.file_name,
