@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, isVNode } from 'vue'
+import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { AudioFile, MusicFolder, FolderNode, RawMetadata } from '../types'
