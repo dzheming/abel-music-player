@@ -23,8 +23,15 @@ lofty = "0.22"
 base64 = "0.22"
 rusqlite = { version = "0.32", features = ["bundled"] }
 reqwest = { version = "0.12", features = ["json"] }
-tokio = { version = "1", features = ["full"] }
-image = "0.25"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif"] }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Registry"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "abort"
+strip = true
