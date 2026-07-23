@@ -11,6 +11,16 @@ import PlayerTimeView from './views/PlayerTimeView.vue'
 const showPlayerView = ref(false)
 const showTimeView = ref(false)
 
+function closePlayerView() {
+    showPlayerView.value = false
+    window.dispatchEvent(new Event('player-view-closed'))
+}
+
+function closeTimeView() {
+    showTimeView.value = false
+    window.dispatchEvent(new Event('player-view-closed'))
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 function debouncedSaveWindow() {
@@ -44,8 +54,8 @@ onUnmounted(() => {
         <PlayerBar class="app-player-bar" @open-player="showPlayerView = true" @open-time-view="showTimeView = true"/>
     </div>
 
-    <PlayerView v-if="showPlayerView" @close="showPlayerView = false" />
-    <PlayerTimeView v-if="showTimeView" @close="showTimeView = false" />
+    <PlayerView v-if="showPlayerView" @close="closePlayerView" />
+    <PlayerTimeView v-if="showTimeView" @close="closeTimeView" />
 </template>
 
 <style scoped>

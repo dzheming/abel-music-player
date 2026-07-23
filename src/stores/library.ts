@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, isVNode } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { AudioFile, MusicFolder, FolderNode, RawMetadata } from '../types'
@@ -18,7 +18,7 @@ export const useLibraryStore = defineStore('library', () => {
     invoke('get_setting', { key: 'selected-folder' }).then(v => {
         if (v) {
             selectedFolderPath.value = v as string
-            scanCurrentFolder(v as string)
+            loadFromCache(v as string)
         }
     }).catch(() => {})
     const audioFiles = ref<AudioFile[]>([])
@@ -45,7 +45,7 @@ export const useLibraryStore = defineStore('library', () => {
         invoke('set_setting', { key: 'music-folders', value: JSON.stringify(folders.value) }).catch(() => {})
 
         await loadFolderTree(path)
-        await selectFolder(path)
+        await scanAndSelect(path)
     }
 
     function removeFolder(path: string) {
@@ -71,7 +71,7 @@ export const useLibraryStore = defineStore('library', () => {
     async function selectFolder(path: string) {
         selectedFolderPath.value = path
         invoke('set_setting', { key: 'selected-folder', value: path }).catch(() => {})
-        await scanCurrentFolder(path)
+        await loadFromCache(path)
     }
 
     interface CachedTrackData {
@@ -84,7 +84,67 @@ export const useLibraryStore = defineStore('library', () => {
         track_number: number | null
     }
 
-    async function scanCurrentFolder(path: string) {
+    async function loadFromCache(path: string) {
+        const myGen = ++scanGeneration
+        isScanning.value = true
+        scanProgress.value = "加载中..."
+        try {
+            const files: string[] = await invoke('scan_music_folder', { path })
+            if (myGen !== scanGeneration) return
+            const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
+            if (myGen !== scanGeneration) return 
+            audioFiles.value = cached.map(c => ({
+                path: c.path,
+                fileName: c.file_name,
+                title: c.title || undefined,
+                artist: c.artist || undefined,
+                album: c.album || undefined,
+                duration: c.duration,
+                trackNumber: c.track_number || undefined,
+            }))
+        } catch (e) {
+            audioFiles.value = []
+        } finally {
+            if (myGen === scanGeneration) {
+                isScanning.value = false
+                scanProgress.value = ''
+            }
+        }
+    }
+
+    async function backgroundScanAll() {
+        for (const folder of folders.value) {
+            try {
+                const files: string[] = await invoke('scan_music_folder', { path: folder.path })
+                const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
+                const cachedPahts = new Set(cached.map(c => c.path))
+                const uncachedPahts = files.filter(f => !cachedPahts.has(f))
+
+                if (uncachedPahts.length > 0) {
+                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { pahts: uncachedPahts })
+                    const cacheData = metadataList.map(m => ({
+                        path: m.path,
+                        file_name: m.file_name,
+                        title: m.title,
+                        artist: m.artist,
+                        album: m.album,
+                        duration: m.duration,
+                        trackNumber: m.track_number,
+                    }))
+                    await invoke('cache_tracks', { tracks: cacheData })
+                    if (selectedFolderPath.value?.startsWith(folder.path)) {
+                        await loadFromCache(selectedFolderPath.value)
+                    }
+                }
+            } catch (e) {
+
+            }
+        }
+    }
+
+    async function scanAndSelect(path: string) {
+        selectedFolderPath.value = path
+        invoke('set_setting', { key: 'selected-folder', value: path }).catch(() => {})
         const myGen = ++scanGeneration
         isScanning.value = true
         scanProgress.value = '正在扫描文件...'
@@ -188,11 +248,13 @@ export const useLibraryStore = defineStore('library', () => {
     async function refreshLibrary() {
         await invoke('clear_track_cache')
         if (selectedFolderPath.value) {
-            await scanCurrentFolder(selectedFolderPath.value)
+            await scanAndSelect(selectedFolderPath.value)
         }
     }
 
-    invoke('cleanup_stale_cache').catch(() => {})
+    invoke('cleanup_stale_cache').then(() => {
+        backgroundScanAll()
+    }).catch(() => {})
 
     return {
         folders, folderTrees, selectedFolderPath, selectedFolder, audioFiles, isScanning, scanProgress,

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useLibraryStore } from '../stores/library'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
@@ -97,6 +97,34 @@ function onTrackContextMenu(e: MouseEvent, path: string) {
 function isPlaying(path: string) {
     return playerStore.currentTrack?.path === path && playerStore.isPlaying
 }
+
+function scrollToPlaying(smooth = false) {
+    nextTick(() => {
+        const el = document.querySelector('.music-list .track-item.playing, .music-grid-view .playing') as HTMLElement | null
+        if (el) {
+            el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'instant' })
+        }
+    })
+}
+
+async function locatePlaying(smooth: boolean) {
+    if (activeTab.value !== 'library' || !playerStore.currentTrack) return
+    const trackDir = playerStore.currentTrack.path.replace(/[/\\][^/\\]+$/, '')
+    if (libraryStore.selectedFolderPath && !trackDir.startsWith(libraryStore.selectedFolderPath)) {
+        const parentFolder = libraryStore.folders.find(f => trackDir.startsWith(f.path))
+        if (parentFolder) {
+            await libraryStore.selectFolder(trackDir)
+        }
+    }
+    scrollToPlaying(smooth)
+}
+
+// watch(() => playerStore.currentTrack?.path, () => locatePlaying(true))
+watch(activeTab, () => locatePlaying(false))
+
+const onPlayerViewClosed = () => locatePlaying(false)
+onMounted(() => window.addEventListener('player-view-closed', onPlayerViewClosed))
+onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewClosed))
 </script>
 
 <template>
