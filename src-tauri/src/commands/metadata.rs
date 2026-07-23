@@ -61,11 +61,13 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
         let track_number = tag.track();
 
         let cover = tag.pictures().first().map(|pic| encode_cover(pic));
-
+        //eprintln!("metadata path {}, title {:?}, artist {:?} album {:?}", file_name, title, artist, album);
         (title, artist, album, cover, track_number)
     } else {
         (None, None, None, None, None)
     };
+
+    
 
     Ok(TrackMetadata {
         path,

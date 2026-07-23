@@ -23,83 +23,82 @@ pub async fn download_lyrics(
     audio_path: String,
 ) -> Result<Option<String>, String> {
     let client = reqwest::Client::new();
-    
     let duration_secs = duration.round() as u64;
+    
+    if let Some(lrc_content) = try_netease(&client, &title, &artist, &album).await {
+        let lrc_path = Path::new(&audio_path).with_extension("lrc");
+        let _ = fs::write(&lrc_path, &lrc_content);
+        return Ok(Some(lrc_content));
+    }
 
+    if let Some(lrc_content) = try_lrclib(&client, &title, &artist, &album, duration_secs).await {
+        let lrc_path = Path::new(&audio_path).with_extension("lrc");
+        let _ = fs::write(&lrc_path, &lrc_content);
+        return Ok(Some(lrc_content));
+    }
+    Ok(None)
+}
+
+async fn try_lrclib(client: &reqwest::Client, title: &str, artist: &str, album: &str, duration_secs: u64) -> Option<String> {
     let url = format!(
         "https://lrclib.net/api/get?track_name={}&artist_name={}&album_name={}&duration={}",
-        urlencoded(&title),
-        urlencoded(&artist),
-        urlencoded(&album),
+        urlencoded(title),
+        urlencoded(artist),
+        urlencoded(album),
         duration_secs
     );
-
 
     let response = client
         .get(&url)
         .header("User-Agent", "AbelMusicPlayer/0.1.0")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .ok()?;
 
     if response.status().is_success() {
-        let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+        let json: serde_json::Value = response.json().await.ok()?;
 
         let lyrics = json
             .get("syncedLyrics")
-            .and_then(|v| v.as_str())
-            .or_else(|| json.get("plainLyrics").and_then(|v| v.as_str()));
+            .and_then(|v| v.as_str());
 
         if let Some(lrc_content) = lyrics {
-            let lrc_path = Path::new(&audio_path).with_extension("lrc");
-            let _ = fs::write(&lrc_path, lrc_content);
-            return Ok(Some(lrc_content.to_string()));
+            return Some(lrc_content.to_string());
         }
     }
 
     let search_url = format!(
         "https://lrclib.net/api/search?track_name={}&artist_name={}",
-        urlencoded(&title),
-        urlencoded(&artist)
+        urlencoded(title),
+        urlencoded(artist)
     );
-
 
     let response = client
         .get(&search_url)
         .header("User-Agent", "AbelMusicPlayer/0.1.0")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .ok()?;
 
     if response.status().is_success() {
-        let json: serde_json::Value = response.json().await.map_err(|e| e.to_string())?;
+        let json: serde_json::Value = response.json().await.ok()?;
 
         if let Some(results) = json.as_array() {
             if let Some(first) = results.first() {
                 let lyrics = first
-                    .get("syncedLyrics")
-                    .and_then(|v| v.as_str())
-                    .or_else(|| first.get("plainLyrics").and_then(|v| v.as_str()));
+                    .get("syncedLyrics");
 
                 if let Some(lrc_content) = lyrics {
-                    let lrc_path = Path::new(&audio_path).with_extension("lrc");
-                    let _ = fs::write(&lrc_path, lrc_content);
-                    return Ok(Some(lrc_content.to_string()));
+                    return Some(lrc_content.to_string());
                 }
             }
         }
     }
 
-    if let Some(lrc_content) = try_netease(&client, &title, &artist).await {
-        let lrc_path = Path::new(&audio_path).with_extension("lrc");
-        let _ = fs::write(&lrc_path, &lrc_content);
-        return Ok(Some(lrc_content));
-    }
-
-    Ok(None)
+    None
 }
 
-async fn try_netease(client: &reqwest::Client, title: &str, artist: &str) -> Option<String> {
+async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album: &str) -> Option<String> {
     let query = if artist.is_empty() {
         title.to_string()
     } else {
@@ -107,7 +106,7 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str) -> Opt
     };
 
     let search_url = format!(
-        "https://music.163.com/api/search/get/web?s={}&type=1&limit=5",
+        "https://music.163.com/api/search/get/web?s={}&type=1&limit=50",
         urlencoded(&query)
     );
 
@@ -121,7 +120,57 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str) -> Opt
 
     let json: serde_json::Value = resp.json().await.ok()?;
     let songs = json.get("result")?.get("songs")?.as_array()?;
-    let song_id = songs.first()?.get("id")?.as_u64()?;
+
+    let title_lower = title.to_lowercase();
+    let artist_lower = artist.to_lowercase();
+    let album_lower = album.to_lowercase();
+
+    let matched = songs.iter().find(|song| {
+        let name_match = song.get("name")
+            .and_then(|n| n.as_str())
+            .map(|n| n.to_lowercase() == title_lower)
+            .unwrap_or(false);
+        let artist_match = artist.is_empty() || song.get("artists")
+            .and_then(|a| a.as_array())
+            .map(|arr| arr.iter().any(|a| {
+                a.get("name").and_then(|n| n.as_str())
+                    .map(|n| n.to_lowercase() == artist_lower)
+                    .unwrap_or(false)
+            }))
+            .unwrap_or(false);
+        let album_match = album.is_empty() || song.get("album")
+            .and_then(|a| a.get("name"))
+            .and_then(|n| n.as_str())
+            .map(|n| {
+                let n_lower = n.to_lowercase();
+                n_lower.contains(&album_lower) || album_lower.contains(&n_lower)
+            })
+            .unwrap_or(false);
+        name_match && artist_match && album_match
+    });
+
+    // if matched.is_some() {
+    //     let s = matched.unwrap();
+    //     eprintln!("try_netease exact matched: name {:?} artist {:?} album {:?}",
+    //         s.get("name").and_then(|v| v.as_str()),
+    //         s.get("artists").and_then(|a| a.as_array()).and_then(|arr| arr.first()).and_then(|a| a.get("name")).and_then(|v| v.as_str()),
+    //         s.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()),
+    //     );
+    // }
+
+    let matched = matched.or_else(|| songs.iter().find(|song| {
+        album.is_empty() || song.get("album")
+            .and_then(|a| a.get("name"))
+            .and_then(|n| n.as_str())
+            .filter(|n| !n.is_empty())
+            .map(|n| {
+                let n_lower = n.to_lowercase();
+                n_lower.contains(&album_lower) || album_lower.contains(&n_lower)
+            })
+            .unwrap_or(false)
+    }));
+    let song = matched.or_else(|| songs.first())?;
+    let song_id = song.get("id")?.as_u64()?;
 
     let lyric_url = format!(
         "https://music.163.com/api/song/lyric?id={}&lv=1",
