@@ -1,4 +1,4 @@
-#![windows_subsystem = "windows"]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 fn main() {
     #[cfg(windows)]
@@ -29,6 +29,32 @@ fn main() {
             }
 
             let _ = handle;
+        }
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::net::UnixListener;
+
+        let sock_path = std::env::temp_dir().join("abel-music-player.sock");
+
+        match UnixListener::bind(&sock_path) {
+            Ok(listener) => {
+                std::mem::forget(listener);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                match std::os::unix::net::UnixStream::connect(&sock_path) {
+                    Ok(_) => return,
+                    Err(_) => {
+                        let _ = std::fs::remove_file(&sock_path);
+                        match UnixListener::bind(&sock_path) {
+                            Ok(listener) => std::mem::forget(listener),
+                            Err(_) => return,
+                        }
+                    }
+                }
+            }
+            Err(_) => return,
         }
     }
 
