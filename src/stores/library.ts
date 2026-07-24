@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { AudioFile, MusicFolder, FolderNode, RawMetadata } from '../types'
+import { event } from '@tauri-apps/api'
 
 export const useLibraryStore = defineStore('library', () => {
     const folders = ref<MusicFolder[]>([])
@@ -87,7 +89,7 @@ export const useLibraryStore = defineStore('library', () => {
     async function loadFromCache(path: string) {
         const myGen = ++scanGeneration
         isScanning.value = true
-        scanProgress.value = "加载中..."
+        scanProgress.value = '加载中...'
         try {
             const files: string[] = await invoke('scan_music_folder', { path })
             if (myGen !== scanGeneration) return
@@ -100,7 +102,7 @@ export const useLibraryStore = defineStore('library', () => {
                 artist: c.artist || undefined,
                 album: c.album || undefined,
                 duration: c.duration,
-                trackNumber: c.track_number || undefined,
+                track_number: c.track_number || undefined,
             }))
         } catch (e) {
             audioFiles.value = []
@@ -173,35 +175,54 @@ export const useLibraryStore = defineStore('library', () => {
 
             if (uncachedPaths.length > 0) {
                 scanProgress.value = `正在读取 ${uncachedPaths.length} 首歌曲元数据...`
-                const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
-                if (myGen !== scanGeneration) return
-                const newFiles = metadataList.map(m => ({
-                    path: m.path,
-                    fileName: m.file_name,
-                    title: m.title || undefined,
-                    artist: m.artist || undefined,
-                    album: m.album || undefined,
-                    duration: m.duration,
-                    coverUrl: m.cover || undefined,
-                    trackNumber: m.track_number || undefined,
-                }))
 
-                if (cached.length > 0) {
-                    audioFiles.value = [...audioFiles.value, ...newFiles]
-                } else {
-                    audioFiles.value = newFiles
+                const unlisten = await listen<RawMetadata[]>('metadata-batch-chunk', (event) => {
+                    if (myGen !== scanGeneration) return
+                    const chunk = event.payload.map(m => ({
+                        path: m.path,
+                        fileName: m.file_name,
+                        title: m.title || undefined,
+                        artist: m.artist || undefined,
+                        album: m.album || undefined,
+                        duration: m.duration,
+                        trackNumber: m.track_number || undefined,
+                    }))
+                    audioFiles.value = [...audioFiles.value, ...chunk]
+                    scanProgress.value = `已加载 ${audioFiles.value.length} / ${files.length} 首...`
+                })
+                try {
+                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
+                    if (myGen !== scanGeneration) return
+
+                    const allPaths = new Set(audioFiles.value.map(f => f.path))
+                    const missing = metadataList.filter(m => !allPaths.has(m.path))
+                    if (missing.length > 0) {
+                        const missingFiles = missing.map(m => ({
+                            path: m.path,
+                            fileName: m.file_name,
+                            title: m.title || undefined,
+                            artist: m.artist || undefined,
+                            album: m.album || undefined,
+                            duration: m.duration,
+                            coverUrl: m.cover || undefined,
+                            trackNumber: m.track_number || undefined,
+                        }))
+                        audioFiles.value = [...audioFiles.value, ...missingFiles]
+                    }
+
+                    const cacheData = metadataList.map(m => ({
+                        path: m.path,
+                        file_name: m.file_name,
+                        title: m.title,
+                        artist: m.artist,
+                        album: m.album,
+                        duration: m.duration,
+                        track_number: m.track_number,
+                    }))
+                    invoke('cache_tracks', { tracks: cacheData }).catch(() => {})
+                } finally {
+                    unlisten()
                 }
-
-                const cacheData = metadataList.map(m => ({
-                    path: m.path,
-                    file_name: m.file_name,
-                    title: m.title,
-                    artist: m.artist,
-                    album: m.album,
-                    duration: m.duration,
-                    track_number: m.track_number,
-                }))
-                invoke('cache_tracks', { tracks: cacheData }).catch(() => {})
             }
         } catch (e) {
             console.error('Scan failed:', e)

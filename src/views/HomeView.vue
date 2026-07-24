@@ -8,6 +8,7 @@ import { useSidebarTab } from '../composables/useSidebarTab'
 import { formatTime, stripExtension } from '../utils/format'
 import ContextMenu from '../components/ContextMenu.vue'
 import MusicCard from '../components/Library/MusicCard.vue'
+import VirtualList from '../components/VirtualList.vue'
 import PlaylistContent from './PlaylistContent.vue'
 import BrowseContent from './BrowseContent.vue'
 import { useTrackContextMenu } from '../composables/useTrackContextMenu'
@@ -20,7 +21,10 @@ const settingsStore = useSettingsStore()
 const { activeTab } = useSidebarTab()
 const localSearch = ref('')
 const menuTrackPath = ref('')
+const virtualListRef = ref<InstanceType<typeof VirtualList> | null>(null)
 const { showMenu, menuX, menuY, onContextMenu: triggerMenu, menuItems } = useTrackContextMenu(() => menuTrackPath.value)
+
+const ITEM_HEIGHT = 36
 
 const displayFiles = computed(() => {
     if (libraryStore.globalSearchQuery) {
@@ -72,6 +76,21 @@ const groupedFiles = computed<GroupedFiles[]>(() => {
     return groups
 })
 
+type FlatItem = { type: 'dir'; dir: string; count: number } | { type: 'track'; file: AudioFile; globalIndex: number }
+
+const flatItems = computed<FlatItem[]>(() => {
+    const result: FlatItem[] = []
+    for (const group of groupedFiles.value) {
+        result.push({ type: 'dir', dir: group.dir, count: group.files.length })
+        if (!collapsedDirs.value.has(group.dir)) {
+            for (const item of group.files) {
+                result.push({ type: 'track', file: item.file, globalIndex: item.globalIndex })
+            }
+        }
+    }
+    return result
+})
+
 const showingGlobalSearch = computed(() => !!libraryStore.globalSearchQuery)
 
 const folderName = computed(() => {
@@ -99,12 +118,22 @@ function isPlaying(path: string) {
 }
 
 function scrollToPlaying(smooth = false) {
-    nextTick(() => {
-        const el = document.querySelector('.music-list .track-item.playing, .music-grid-view .playing') as HTMLElement | null
-        if (el) {
-            el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'instant' })
+    if (!playerStore.currentTrack) return
+    if (virtualListRef.value) {
+        const idx = flatItems.value.findIndex(
+            item => item.type === 'track' && item.file.path === playerStore.currentTrack?.path
+        )
+        if (idx >= 0) {
+            virtualListRef.value.scrollToIndex(idx, smooth ? 'smooth' : 'auto')
         }
-    })
+    } else {
+        nextTick(() => {
+            const el = document.querySelector('.music-grid-view .playing') as HTMLElement | null
+            if (el) {
+                el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'instant' })
+            }
+        })
+    }
 }
 
 async function locatePlaying(smooth: boolean) {
@@ -116,7 +145,7 @@ async function locatePlaying(smooth: boolean) {
             await libraryStore.selectFolder(trackDir)
         }
     }
-    scrollToPlaying(smooth)
+    nextTick(() => scrollToPlaying(smooth))
 }
 
 // watch(() => playerStore.currentTrack?.path, () => locatePlaying(true))
@@ -162,41 +191,57 @@ onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewC
                 </div>
             </div>
 
-            <div v-if="libraryStore.isScanning || libraryStore.isGlobalSearching" class="loading-state">
+            <div v-if="(libraryStore.isScanning || libraryStore.isGlobalSearching) && displayFiles.length === 0" class="loading-state">
                 <p>{{ libraryStore.scanProgress || '扫描中...' }}</p>
             </div>
 
-            <div v-else-if="displayFiles.length === 0" class="empty-state">
+            <div v-else-if="!libraryStore.isScanning && displayFiles.length === 0" class="empty-state">
                 <div class="empty-icon">🎵</div>
                 <p class="empty-text">{{ showingGlobalSearch ? '未找到匹配的音乐' : '没有找到音频文件' }}</p>
             </div>
 
-            <div v-else-if="settingsStore.viewMode === 'list'" class="music-list">
-                <div v-for="group in groupedFiles" :key="group.dir" class="dir-group">
-                    <div class="dir-separator" @click="toggleDir(group.dir)">
-                        <span class="dir-arrow" :class="{ collapsed: collapsedDirs.has(group.dir) }">&#9662;</span>
-                        <span class="dir-path">{{ group.dir }}</span>
-                        <span class="dir-count">{{ group.files.length }}</span>
-                        <span class="dir-line"></span>
-                    </div>
-                    <template v-if="!collapsedDirs.has(group.dir)">
-                        <div
-                            v-for="item in group.files"
-                            :key="item.file.path"
-                            class="track-item"
-                            :class="{ playing: isPlaying(item.file.path) }"
-                            @dblclick="onTrackDblClick(item.file)"
-                            @contextmenu="onTrackContextMenu($event, item.file.path)"
-                        >
-                            <span class="track-index">{{ item.file.trackNumber || '-' }}</span>
-                            <span class="track-title">{{ item.file.title || stripExtension(item.file.fileName) }}</span>
-                            <span class="track-album">{{ item.file.album || '' }}</span>
-                            <span class="track-duration">{{ formatTime(item.file.duration || 0) }}</span>
-                        </div>
-                    </template>
-                </div>
+            <div v-if="libraryStore.isScanning && displayFiles.length > 0" class="sacn-progress-bar">
+                {{ libraryStore.scanProgress }}
             </div>
 
+            <!-- List view (virtual scroll) -->
+            <VirtualList
+                v-else-if="settingsStore.viewMode === 'list'"
+                ref="virtualListRef"
+                :items="flatItems"
+                :item-height="ITEM_HEIGHT"
+                :overscan="20"
+                class="music-list"
+            >
+                <template #default="{ item }">
+                    <div
+                        v-if="item.type === 'dir'"
+                        class="dir-separator"
+                        :style="{ height: ITEM_HEIGHT + 'px' }"
+                        @click="toggleDir(item.dir)"
+                    >
+                        <span class="dir-arrow" :class="{ collapsed: collapsedDirs.has(item.dir) }">&#9662;</span>
+                        <span class="dir-path">{{ item.dir }}</span>
+                        <span class="dir-count">{{ item.count }}</span>
+                        <span class="dir-line"></span>
+                    </div>
+                    <div
+                        v-else
+                        class="track-item"
+                        :style="{ height: ITEM_HEIGHT + 'px' }"
+                        :class="{ playing: isPlaying(item.file.path) }"
+                        @dblclick="onTrackDblClick(item.file)"
+                        @contextmenu="onTrackContextMenu($event, item.file.path)"
+                    >
+                        <span class="track-index">{{ item.file.trackNumber || '-' }}</span>
+                        <span class="track-title">{{ item.file.title || stripExtension(item.file.fileName) }}</span>
+                        <span class="track-album">{{ item.file.album || '' }}</span>
+                        <span class="track-duration">{{ formatTime(item.file.duration || 0) }}</span>
+                    </div>
+                </template>
+            </VirtualList>
+
+            <!-- Card view -->
             <div v-else class="music-grid-view">
                 <template v-for="group in groupedFiles" :key="group.dir">
                     <div class="dir-separator" @click="toggleDir(group.dir)">
@@ -363,14 +408,16 @@ onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewC
     color: var(--color-text-secondary);
 }
 
-.music-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 16px 16px;
+.scan-progress-bar {
+    padding: 4px 24px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    flex-shrink: 0;
 }
 
-.dir-group {
-    margin-bottom: 4px;
+.music-list {
+    flex: 1;
+    padding: 0 16px 16px;
 }
 
 .dir-separator {

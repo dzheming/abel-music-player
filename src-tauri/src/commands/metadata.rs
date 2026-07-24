@@ -1,8 +1,10 @@
 use base64::Engine;
 use lofty::prelude::*;
 use lofty::probe::Probe;
+use rayon::prelude::*;
 use serde::Serialize;
 use std::path::Path;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Serialize)]
 pub struct TrackMetadata {
@@ -33,10 +35,10 @@ fn encode_cover(pic: &lofty::picture::Picture) -> String {
 }
 
 #[tauri::command]
-pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
-    let file_path = Path::new(&path);
+pub fn read_metadata_inner(path: &str, include_cover: bool) -> Option<TrackMetadata> {
+    let file_path = Path::new(path);
     if !file_path.exists() {
-        return Err(format!("File not found: {}", path));
+        return None;
     }
 
     let file_name = file_path
@@ -44,10 +46,7 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    let tagged_file = Probe::open(file_path)
-        .map_err(|e| e.to_string())?
-        .read()
-        .map_err(|e| e.to_string())?;
+    let tagged_file = Probe::open(file_path).ok()?.read().ok()?;
 
     let properties = tagged_file.properties();
     let duration = properties.duration().as_secs_f64();
@@ -60,7 +59,11 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
         let album = tag.album().map(|s| s.to_string());
         let track_number = tag.track();
 
-        let cover = tag.pictures().first().map(|pic| encode_cover(pic));
+        let cover = if include_cover {
+            tag.pictures().first().map(|pic| encode_cover(pic))
+        } else {
+            None
+        };
         //eprintln!("metadata path {}, title {:?}, artist {:?} album {:?}", file_name, title, artist, album);
         (title, artist, album, cover, track_number)
     } else {
@@ -69,8 +72,8 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
 
     
 
-    Ok(TrackMetadata {
-        path,
+    Some(TrackMetadata {
+        path: path.to_string(),
         file_name,
         title,
         artist,
@@ -82,11 +85,24 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
 }
 
 #[tauri::command]
-pub fn read_metadata_batch(paths: Vec<String>) -> Vec<TrackMetadata> {
-    paths
-        .into_iter()
-        .filter_map(|p| read_metadata(p).ok())
-        .collect()
+pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
+    read_metadata_inner(&path, true).ok_or_else(|| format!("Failed to read: {}", path))
+}
+
+#[tauri::command]
+pub fn read_metadata_batch(app: AppHandle, paths: Vec<String>) -> Vec<TrackMetadata> {
+    const BATH_SIZE: usize = 100;
+    
+    let results: Vec<TrackMetadata> = paths
+        .par_iter()
+        .filter_map(|p| read_metadata_inner(p, false))
+        .collect();
+
+    for chunk in results.chunks(BATH_SIZE) {
+        let _ = app.emit("metadata-batch-chunk", chunk);
+    }
+
+    results
 }
 
 #[tauri::command]
