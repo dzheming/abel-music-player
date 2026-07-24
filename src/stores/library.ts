@@ -4,7 +4,6 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
 import type { AudioFile, MusicFolder, FolderNode, RawMetadata } from '../types'
-import { event } from '@tauri-apps/api'
 
 export const useLibraryStore = defineStore('library', () => {
     const folders = ref<MusicFolder[]>([])

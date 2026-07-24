@@ -8,7 +8,7 @@ use commands::database::{
     get_artists, get_albums, get_tracks_by_artist, get_tracks_by_album,
     search_tracks, get_setting, set_setting, get_random_tracks,
 };
-use commands::lyrics::{download_lyrics, read_local_lyrics};
+use commands::lyrics::{download_lyrics, fetch_netease_lyric, read_local_lyrics, search_netease_lyrics};
 use commands::metadata::{read_cover, read_metadata, read_metadata_batch};
 use commands::portable::get_portable_dir;
 use commands::scanner::{scan_folder_files, scan_folder_tree, scan_music_folder};
@@ -38,6 +38,8 @@ pub fn run() {
             read_cover,
             read_local_lyrics,
             download_lyrics,
+            search_netease_lyrics,
+            fetch_netease_lyric,
             set_taskbar_icon,
             reset_taskbar_icon,
             save_window_state,

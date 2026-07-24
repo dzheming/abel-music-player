@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
@@ -86,7 +87,8 @@ async fn try_lrclib(client: &reqwest::Client, title: &str, artist: &str, album: 
         if let Some(results) = json.as_array() {
             if let Some(first) = results.first() {
                 let lyrics = first
-                    .get("syncedLyrics");
+                    .get("syncedLyrics")
+                    .and_then(|v| v.as_str());
 
                 if let Some(lrc_content) = lyrics {
                     return Some(lrc_content.to_string());
@@ -162,7 +164,7 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album:
         if album.is_empty() { return None; }
         
         songs.iter().find(|song| {
-        album.is_empty() || song.get("album")
+            song.get("album")
             .and_then(|a| a.get("name"))
             .and_then(|n| n.as_str())
             .filter(|n| !n.is_empty())
@@ -198,6 +200,102 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album:
 
     Some(lrc.to_string())
 
+}
+
+#[derive(Serialize)]
+pub struct NeteaseSearchResult {
+    pub id: u64,
+    pub name: String,
+    pub artist: String,
+    pub album: String,
+}
+
+#[tauri::command]
+pub async fn search_netease_lyrics(query: String, artist_filter: String) -> Result<Vec<NeteaseSearchResult>, String> {
+    let client = reqwest::Client::new();
+    let search_url = format!(
+        "https://music.163.com/api/search/get/web?s={}&type=1&limit=100",
+        urlencoded(&query)
+    );
+
+    let resp = client
+        .post(&search_url)
+        .header("User-Agent", "Mozilla/5.0")
+        .header("Referer", "https://music.163.com/")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+
+    let songs = json
+        .get("result")
+        .and_then(|r| r.get("songs"))
+        .and_then(|s| s.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let filter_lower = artist_filter.to_lowercase();
+
+    let results = songs.iter().filter_map(|song| {
+        let id = song.get("id")?.as_u64()?;
+        let name = song.get("name")?.as_str()?.to_string();
+        let artist = song.get("artists")
+            .and_then(|a| a.as_array())
+            .map(|arr| arr.iter()
+                .filter_map(|a| a.get("name").and_then(|n| n.as_str())) 
+                .collect::<Vec<_>>()
+                .join(" / "))
+            .unwrap_or_default();
+        let album = song.get("album")
+            .and_then(|a| a.get("name"))
+            .and_then(|n| n.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if !filter_lower.is_empty() {
+            let artist_lower = artist.to_lowercase();
+            if !artist_lower.contains(&filter_lower) && !filter_lower.contains(&artist_lower) {
+                return None;
+            }
+        }
+        Some(NeteaseSearchResult { id, name, artist, album })
+    }).collect();
+    
+    Ok(results)
+}
+
+#[tauri::command]
+pub async fn fetch_netease_lyric(song_id: u64, audio_path: String) -> Result<Option<String>, String> {
+    let client = reqwest::Client::new();
+    let lyric_url = format!(
+        "https://music.163.com/api/song/lyric?id={}&lv=1",
+        song_id
+    );
+
+    let resp = client
+        .get(&lyric_url)
+        .header("User-Agent", "Mozilla/5.0")
+        .header("Referer", "https://music.163.com/")
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+
+    let lrc = json.get("lrc")
+        .and_then(|l| l.get("lyric"))
+        .and_then(|l| l.as_str())
+        .unwrap_or("");
+
+    if lrc.is_empty() {
+        return Ok(None);
+    }
+
+    let lrc_path = Path::new(&audio_path).with_extension("lrc");
+    let _ = fs::write(&lrc_path, lrc);
+
+    Ok(Some(lrc.to_string()))
 }
 
 fn urlencoded(s: &str) -> String {

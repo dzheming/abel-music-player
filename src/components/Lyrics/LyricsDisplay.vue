@@ -4,6 +4,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { usePlayerStore } from '../../stores/player'
 import { parseLrc, findCurrentLine } from '../../utils/lrc-parser'
 import type { LrcLine } from '../../utils/lrc-parser'
+import LyricsSearchDialog from './LyricsSearchDialog.vue'
+import ContextMenu from '../ContextMenu.vue'
 
 const playerStore = usePlayerStore()
 const lyricsLines = ref<LrcLine[]>([])
@@ -12,6 +14,23 @@ const containerRef = ref<HTMLElement | null>(null)
 const spacerHeight = ref('50vh')
 const isLoading = ref(false)
 const noLyrics = ref(false)
+const showSearchDialog = ref(false)
+const showContextMenu = ref(false)
+const menuX = ref(0)
+const menuY = ref(0)
+
+function onContextMenu(e: MouseEvent) {
+    if (!playerStore.currentTrack) return
+    menuX.value = e.clientX
+    menuY.value = e.clientY
+    showContextMenu.value = true
+}
+
+function onLyricsSelected(lrc: string) {
+    lyricsLines.value = parseLrc(lrc)
+    noLyrics.value = lyricsLines.value.length === 0
+    showSearchDialog.value = false
+}
 
 const currentLine = computed(() =>
     findCurrentLine(lyricsLines.value, playerStore.currentTime)
@@ -112,9 +131,9 @@ function scrollToLine(index: number) {
 </script>
 
 <template>
-    <div class="lyrics-display" ref="containerRef">
+    <div class="lyrics-display" ref="containerRef" @contextmenu.prevent="onContextMenu">
         <div v-if="isLoading" class="lyrics-status">歌词加载中...</div>
-        <div v-else-if="noLyrics" class="lyrics-status">暂无歌词...</div>
+        <div v-else-if="noLyrics" class="lyrics-status lyrics-clickable" @click="showSearchDialog = true">暂无歌词,点击搜索</div>
         <div v-else-if="lyricsLines.length === 0 && !playerStore.currentTrack" class="lyrics-status">未播放</div>
         <div v-else class="lyrics-content">
             <div class="lyrics-spacer" :style="{ height: spacerHeight }"></div>
@@ -127,6 +146,24 @@ function scrollToLine(index: number) {
             >{{ line.text || '...' }}</p>
             <div class="lyrics-spacer" :style="{ height: spacerHeight }"></div>
         </div>
+
+        <ContextMenu
+            v-if="showContextMenu"
+            :x="menuX"
+            :y="menuY"
+            :items="[{ label: '搜索歌词', action: () => { showContextMenu = false; showSearchDialog = true } }]"
+            @close="showContextMenu = false"
+        />
+
+        <LyricsSearchDialog
+            v-if="showSearchDialog"
+            :title="playerStore.currentTrack?.title || ''"
+            :album="playerStore.currentTrack?.album || ''"
+            :artist="playerStore.currentTrack?.artist || ''"
+            :audio-path="playerStore.currentTrack?.path || ''"
+            @select="onLyricsSelected"
+            @close="showSearchDialog = false"
+        />
     </div>
 </template>
 
@@ -149,6 +186,15 @@ function scrollToLine(index: number) {
     height: 100%;
     color: var(--color-text-tertiary);
     font-size: 14px;
+}
+
+.lyrics-clickable {
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.lyrics-clickable:hover {
+    color: var(--color-accent);
 }
 
 .lyrics-content {
