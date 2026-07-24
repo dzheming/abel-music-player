@@ -65,9 +65,10 @@ const menuItems = computed<MenuItem[]>(() => {
             action: () => {},
             children: playlistStore.playlists.map(pl => ({
                 label: pl.name,
-                action: async () => {
-                    const paths = await scanNodeFiles()
-                    if (paths.length > 0) await playlistStore.addToPlaylist(pl.id, paths)
+                action: () => {
+                    scanNodeFiles().then(paths => {
+                        if (paths.length > 0) playlistStore.addToPlaylist(pl.id, paths)
+                    })
                 },
             })),
         })
@@ -75,13 +76,15 @@ const menuItems = computed<MenuItem[]>(() => {
 
     items.push({
         label: '新建播放列表',
-        action: async () => {
+        action: () => {
             const name = `新播放列表 ${playlistStore.playlists.length + 1}`
-            const pl = await playlistStore.createPlaylist(name)
-            if (pl) {
-                const paths = await scanNodeFiles()
-                if (paths.length > 0) await playlistStore.addToPlaylist(pl.id, paths)
-            }
+            playlistStore.createPlaylist(name).then(pl => {
+                if (pl) {
+                    scanNodeFiles().then(paths => {
+                        if (paths.length > 0) playlistStore.addToPlaylist(pl.id, paths)
+                    })
+                }
+            })
         },
     })
 

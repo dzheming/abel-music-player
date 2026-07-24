@@ -76,10 +76,10 @@ export const usePlaylistStore = defineStore('playlist', () => {
 
     async function addToPlaylist(playlistId: number, paths: string[]) {
         try {
-            await invoke('add_to_playlist', { playlistId, paths })
+            const added: number = await invoke('add_to_playlist', { playlistId, paths })
             const p = playlists.value.find(p => p.id === playlistId)
-            if (p) p.track_count += paths.length
-            if (currentPlaylistId.value === playlistId) {
+            if (p) p.track_count += added
+            if (currentPlaylistId.value === playlistId && added > 0) {
                 await selectPlaylist(playlistId)
             }
         } catch (e) {
@@ -89,9 +89,9 @@ export const usePlaylistStore = defineStore('playlist', () => {
 
     async function removeFromPlaylist(playlistId: number, paths: string[]) {
         try {
-            await invoke('remove_from_playlist', { playlistId, paths })
+            const removed: number = await invoke('remove_from_playlist', { playlistId, paths })
             const p = playlists.value.find(p => p.id === playlistId)
-            if (p) p.track_count = Math.max(0, p.track_count - paths.length)
+            if (p) p.track_count = Math.max(0, p.track_count - removed)
             if (currentPlaylistId.value === playlistId) {
                 currentTracks.value = currentTracks.value.filter(t => !paths.includes(t.path))
             }

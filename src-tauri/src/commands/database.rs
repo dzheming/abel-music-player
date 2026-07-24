@@ -148,7 +148,7 @@ pub fn get_playlists(state: tauri::State<'_, DbState>) -> Result<Vec<Playlist>, 
 }
 
 #[tauri::command]
-pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<(), String> {
+pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let max_pos: i64 = conn.query_row(
         "SELECT COALESCE(MAX(position), -1) FROM playlist_tracks WHERE playlist_id = ?1",
@@ -178,7 +178,9 @@ pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State
         }
     }
 
+    conn.execute("BEGIN", []).map_err(|e| e.to_string())?;
     let mut pos = max_pos + 1;
+    let mut added: u64 = 0;
     for path in &paths {
         if existing_paths.contains(path) { continue; }
         conn.execute(
@@ -186,20 +188,24 @@ pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State
             params![playlist_id, path, pos]
         ).map_err(|e| e.to_string())?;
         pos += 1;
+        added += 1;
     }
-    Ok(())
+    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    Ok(added)
 }
 
 #[tauri::command]
-pub fn remove_from_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<(), String> {
+pub fn remove_from_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let mut removed: u64 = 0;
     for path in &paths {
-        conn.execute(
+        let n = conn.execute(
             "DELETE FROM playlist_tracks WHERE playlist_id = ?1 AND path = ?2",
             params![playlist_id, path]
         ).map_err(|e| e.to_string())?;
+        removed += n as u64;
     }
-    Ok(())
+    Ok(removed)
 }
 
 #[tauri::command]
