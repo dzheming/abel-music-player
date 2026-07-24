@@ -14,9 +14,7 @@ async function minimize() {
 
 async function toggleMaximize() {
     await appWindow.toggleMaximize()
-    setTimeout(() => {
-        invoke('save_window_state').catch(() => {})
-    }, MAXIMIZE_SAVE_DELAY);
+    setTimeout(() => invoke('save_window_state').catch(() => {}), MAXIMIZE_SAVE_DELAY);
 }
 
 async function close() {

@@ -77,7 +77,7 @@ const menuItems = computed<MenuItem[]>(() => {
     items.push({
         label: '新建播放列表',
         action: () => {
-            const name = `新播放列表 ${playlistStore.playlists.length + 1}`
+            const name = `新播放列表 ${Date.now().toString(36)}`
             playlistStore.createPlaylist(name).then(pl => {
                 if (pl) {
                     scanNodeFiles().then(paths => {

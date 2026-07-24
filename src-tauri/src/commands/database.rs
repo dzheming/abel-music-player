@@ -36,6 +36,7 @@ pub fn init_db() -> Connection {
             scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
         CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist ON playlist_tracks(playlist_id, position);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_playlist_tracks_unique ON playlist_tracks(playlist_id, path);
         CREATE INDEX IF NOT EXISTS idx_track_cache_artist ON track_cache(artist);
         CREATE INDEX IF NOT EXISTS idx_track_cache_album ON track_cache(album);
         CREATE TABLE IF NOT EXISTS settings (
@@ -150,61 +151,50 @@ pub fn get_playlists(state: tauri::State<'_, DbState>) -> Result<Vec<Playlist>, 
 #[tauri::command]
 pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let max_pos: i64 = conn.query_row(
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let max_pos: i64 = tx.query_row(
         "SELECT COALESCE(MAX(position), -1) FROM playlist_tracks WHERE playlist_id = ?1",
         &[&playlist_id], |row| row.get(0)
     ).unwrap_or(-1);
 
-    let mut existing_paths: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for chunk in paths.chunks(500) {
-        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!(
-            "SELECT path FROM playlist_tracks WHERE playlist_id = ?1 AND path IN ({})",
-            placeholders
-        );
-        let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-        let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
-        params_vec.push(Box::new(playlist_id));
-        for path in chunk {
-            params_vec.push(Box::new(path.clone()));
-        }
-        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
-        let rows = stmt.query_map(params_refs.as_slice(), |row| row.get::<_, String>(0))
-            .map_err(|e| e.to_string())?;
-        for row in rows {
-            if let Ok(p) = row {
-                existing_paths.insert(p);
-            }
-        }
-    }
-
-    conn.execute("BEGIN", []).map_err(|e| e.to_string())?;
     let mut pos = max_pos + 1;
     let mut added: u64 = 0;
     for path in &paths {
-        if existing_paths.contains(path) { continue; }
-        conn.execute(
-            "INSERT INTO playlist_tracks (playlist_id, path, position) VALUES (?1, ?2, ?3)",
+        let n= tx.execute(
+            "INSERT OR IGNORE INTO playlist_tracks (playlist_id, path, position) VALUES (?1, ?2, ?3)",
             params![playlist_id, path, pos]
         ).map_err(|e| e.to_string())?;
-        pos += 1;
-        added += 1;
+        if n > 0 {
+            pos += 1;
+            added += 1;
+        }
     }
-    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(added)
 }
 
 #[tauri::command]
 pub fn remove_from_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     let mut removed: u64 = 0;
-    for path in &paths {
-        let n = conn.execute(
-            "DELETE FROM playlist_tracks WHERE playlist_id = ?1 AND path = ?2",
-            params![playlist_id, path]
-        ).map_err(|e| e.to_string())?;
+
+    for chunk in paths.chunks(500) {
+        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "DELETE FROM playlist_tracks WHERE playlist_id = ? AND path IN ({})",
+            placeholders
+        );
+        let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+        params_vec.push(Box::new(playlist_id));
+        for path in chunk {
+            params_vec.push(Box::new(path.clone()));
+        }
+        let params_refs: Vec<&dyn rusqlite::types::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let n = tx.execute(&sql, params_refs.as_slice()).map_err(|e| e.to_string())?;
         removed += n as u64;
     }
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(removed)
 }
 
@@ -283,15 +273,15 @@ pub fn get_cached_tracks_for_paths(paths: Vec<String>, state: tauri::State<'_, D
 #[tauri::command]
 pub fn cache_tracks(tracks: Vec<CachedTrack>, state: tauri::State<'_, DbState>) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute("BEGIN", []).map_err(|e| e.to_string())?;
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for track in &tracks {
-        conn.execute(
+        tx.execute(
             "INSERT OR REPLACE INTO track_cache (path, file_name, title, artist, album, duration, track_number)
             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             params![track.path, track.file_name, track.title, track.artist, track.album, track.duration, track.track_number]
         ).map_err(|e| e.to_string())?;
     }
-    conn.execute("COMMIT", []).map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 

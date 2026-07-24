@@ -42,7 +42,7 @@ export const usePlayerStore = defineStore('player', () => {
         if (v) shuffle.value = v === 'true'
     }).catch(() => {})
     invoke('get_setting', { key: 'loop-mode' }).then(v => {
-        if (v) loopMode.value = v as LoopMode
+        if (v && Object.values(LoopMode).includes(v as LoopMode)) loopMode.value = v as LoopMode
     }).catch(() => {})
 
     const isRestoringState = ref(true)

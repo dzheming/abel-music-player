@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::path::Path;
 use tauri::{AppHandle, Emitter};
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct TrackMetadata {
     pub path: String,
     pub file_name: String,
@@ -34,8 +34,7 @@ fn encode_cover(pic: &lofty::picture::Picture) -> String {
     format!("data:{};base64,{}", mime, b64)
 }
 
-#[tauri::command]
-pub fn read_metadata_inner(path: &str, include_cover: bool) -> Option<TrackMetadata> {
+fn read_metadata_inner(path: &str, include_cover: bool) -> Option<TrackMetadata> {
     let file_path = Path::new(path);
     if !file_path.exists() {
         return None;
@@ -46,31 +45,32 @@ pub fn read_metadata_inner(path: &str, include_cover: bool) -> Option<TrackMetad
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_default();
 
-    let tagged_file = Probe::open(file_path).ok()?.read().ok()?;
-
-    let properties = tagged_file.properties();
-    let duration = properties.duration().as_secs_f64();
-
-    let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
-
-    let (title, artist, album, cover, track_number) = if let Some(tag) = tag {
-        let title = tag.title().map(|s| s.to_string());
-        let artist = tag.artist().map(|s| s.to_string());
-        let album = tag.album().map(|s| s.to_string());
-        let track_number = tag.track();
-
-        let cover = if include_cover {
-            tag.pictures().first().map(|pic| encode_cover(pic))
-        } else {
-            None
-        };
-        //eprintln!("metadata path {}, title {:?}, artist {:?} album {:?}", file_name, title, artist, album);
-        (title, artist, album, cover, track_number)
-    } else {
-        (None, None, None, None, None)
+    let tagged_file = match Probe::open(file_path).and_then(|p| p.read()) {
+        Ok(f) => Some(f),
+        Err(_) => None,
     };
 
-    
+    let (duration, title, artist, album, cover, track_number) = if let Some(ref tf) = tagged_file {
+        let duration = tf.properties().duration().as_secs_f64();
+        let tag = tf.primary_tag().or_else(|| tf.first_tag());
+        if let Some(tag) = tag {
+            let title = tag.title().map(|s| s.to_string());
+            let artist = tag.artist().map(|s| s.to_string());
+            let album = tag.album().map(|s| s.to_string());
+            let track_number = tag.track();
+
+            let cover = if include_cover {
+                tag.pictures().first().map(|pic| encode_cover(pic))
+            } else {
+                None
+            };
+            (duration, title, artist, album, cover, track_number)
+        } else {
+            (duration, None, None, None, None, None)
+        }
+    } else {
+        (0.0, None, None, None, None, None)
+    };
 
     Some(TrackMetadata {
         path: path.to_string(),
@@ -90,19 +90,32 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
 }
 
 #[tauri::command]
-pub fn read_metadata_batch(app: AppHandle, paths: Vec<String>) -> Vec<TrackMetadata> {
-    const BATH_SIZE: usize = 100;
+pub async fn read_metadata_batch(app: AppHandle, paths: Vec<String>) -> Vec<TrackMetadata> {
+    const CHUNK_SIZE: usize = 100;
     
-    let results: Vec<TrackMetadata> = paths
-        .par_iter()
-        .filter_map(|p| read_metadata_inner(p, false))
-        .collect();
+    let mut all_results: Vec<TrackMetadata> = Vec::with_capacity(paths.len());
 
-    for chunk in results.chunks(BATH_SIZE) {
-        let _ = app.emit("metadata-batch-chunk", chunk);
+    for chunk in paths.chunks(CHUNK_SIZE) {
+        let chunk_owned: Vec<String> = chunk.to_vec();
+        let results = match tokio::task::spawn_blocking(move || {
+            chunk_owned.par_iter()
+                .filter_map(|p| read_metadata_inner(p, false))
+                .collect::<Vec<_>>()
+        }).await {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("[metadata] spawn_blocking failed: {}", e);
+                continue;
+            }
+        };
+
+        if !results.is_empty() {
+            let _ = app.emit("metadata-batch-chunk", &results);
+            all_results.extend(results);
+        }
     }
 
-    results
+    all_results
 }
 
 #[tauri::command]

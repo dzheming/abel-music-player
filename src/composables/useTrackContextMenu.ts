@@ -34,7 +34,7 @@ export function useTrackContextMenu(getPath: () => string) {
         items.push({
             label: '新建播放列表',
             action: async () => {
-                const name = `新播放列表 ${playlistStore.playlists.length + 1}`
+                const name = `新播放列表 ${Date.now().toString(36)}`
                 const pl = await playlistStore.createPlaylist(name)
                 if (pl) await playlistStore.addToPlaylist(pl.id, [path])
             },

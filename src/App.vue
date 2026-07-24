@@ -41,6 +41,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.removeEventListener('resize', debouncedSaveWindow)
+    if (saveTimer) clearTimeout(saveTimer)
 })
 </script>
 

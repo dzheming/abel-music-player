@@ -2,6 +2,18 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 
+fn save_lrc(audio_path: &str, content: &str) {
+    let audio = Path::new(audio_path);
+    if !audio.exists() { return; }
+    let lrc_path = audio.with_extension("lrc");
+    if let Some(parent) = lrc_path.parent() {
+        if !parent.exists() { return; }
+    }
+    if let Err(e) = fs::write(&lrc_path, content) {
+        eprintln!("[lyrics] failed to save {}: {}", lrc_path.display(), e);
+    }
+}
+
 #[tauri::command]
 pub fn read_local_lyrics(audio_path: String) -> Result<Option<String>, String> {
     let path = Path::new(&audio_path);
@@ -27,14 +39,12 @@ pub async fn download_lyrics(
     let duration_secs = duration.round() as u64;
     
     if let Some(lrc_content) = try_netease(&client, &title, &artist, &album).await {
-        let lrc_path = Path::new(&audio_path).with_extension("lrc");
-        let _ = fs::write(&lrc_path, &lrc_content);
+        save_lrc(&audio_path, &lrc_content);
         return Ok(Some(lrc_content));
     }
 
     if let Some(lrc_content) = try_lrclib(&client, &title, &artist, &album, duration_secs).await {
-        let lrc_path = Path::new(&audio_path).with_extension("lrc");
-        let _ = fs::write(&lrc_path, &lrc_content);
+        save_lrc(&audio_path, &lrc_content);
         return Ok(Some(lrc_content));
     }
     Ok(None)
@@ -292,8 +302,9 @@ pub async fn fetch_netease_lyric(song_id: u64, audio_path: String) -> Result<Opt
         return Ok(None);
     }
 
-    let lrc_path = Path::new(&audio_path).with_extension("lrc");
-    let _ = fs::write(&lrc_path, lrc);
+    if !audio_path.is_empty() {
+        save_lrc(&audio_path, lrc);
+    }
 
     Ok(Some(lrc.to_string()))
 }

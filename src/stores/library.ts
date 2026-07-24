@@ -9,19 +9,28 @@ export const useLibraryStore = defineStore('library', () => {
     const folders = ref<MusicFolder[]>([])
     const folderTrees = ref<Map<string, FolderNode>>(new Map())
     const selectedFolderPath = ref<string | null>(null)
-    invoke('get_setting', {key: 'music-folders' }).then(v => {
-        if (v) folders.value = JSON.parse(v as string)
-        for (const folder of folders.value) {
-            loadFolderTree(folder.path)
-        }
-    }).catch(() => {})
-    
-    invoke('get_setting', { key: 'selected-folder' }).then(v => {
-        if (v) {
-            selectedFolderPath.value = v as string
-            loadFromCache(v as string)
-        }
-    }).catch(() => {})
+    async function initLibrary() {
+        try {
+            const foldersRaw = await invoke('get_setting', { key: 'music-folders' })
+            if (foldersRaw) {
+                try { folders.value = JSON.parse(foldersRaw as string) } catch {}
+            }
+            for (const folder of folders.value) {
+                loadFolderTree(folder.path)
+            }
+            const selectedRaw = await invoke('get_setting', { key: 'selected-folder' })
+            if (selectedRaw) {
+                selectedFolderPath.value = selectedRaw as string
+                await loadFromCache(selectedRaw as string)
+            }
+        } catch {}
+        
+        try {
+            await invoke('cleanup_stale_cache')
+            await backgroundScanAll()
+        } catch {}
+    }
+    initLibrary()
     const audioFiles = ref<AudioFile[]>([])
     const isScanning = ref(false)
     const scanProgress = ref('')
@@ -71,6 +80,8 @@ export const useLibraryStore = defineStore('library', () => {
 
     async function selectFolder(path: string) {
         selectedFolderPath.value = path
+        globalSearchQuery.value = ''
+        globalSearchResults.value = []
         invoke('set_setting', { key: 'selected-folder', value: path }).catch(() => {})
         await loadFromCache(path)
     }
@@ -101,7 +112,7 @@ export const useLibraryStore = defineStore('library', () => {
                 artist: c.artist || undefined,
                 album: c.album || undefined,
                 duration: c.duration,
-                track_number: c.track_number || undefined,
+                trackNumber: c.track_number || undefined,
             }))
         } catch (e) {
             audioFiles.value = []
@@ -122,7 +133,7 @@ export const useLibraryStore = defineStore('library', () => {
                 const uncachedPaths = files.filter(f => !cachedPaths.has(f))
 
                 if (uncachedPaths.length > 0) {
-                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { Paths: uncachedPaths })
+                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
                     const cacheData = metadataList.map(m => ({
                         path: m.path,
                         file_name: m.file_name,
@@ -130,7 +141,7 @@ export const useLibraryStore = defineStore('library', () => {
                         artist: m.artist,
                         album: m.album,
                         duration: m.duration,
-                        trackNumber: m.track_number,
+                        track_number: m.track_number,
                     }))
                     await invoke('cache_tracks', { tracks: cacheData })
                     if (selectedFolderPath.value?.startsWith(folder.path)) {
@@ -149,6 +160,7 @@ export const useLibraryStore = defineStore('library', () => {
         const myGen = ++scanGeneration
         isScanning.value = true
         scanProgress.value = '正在扫描文件...'
+        audioFiles.value = []
         try {
             const files: string[] = await invoke('scan_music_folder', { path })
             if (myGen !== scanGeneration) return
@@ -270,11 +282,8 @@ export const useLibraryStore = defineStore('library', () => {
         if (selectedFolderPath.value) {
             await scanAndSelect(selectedFolderPath.value)
         }
+        await backgroundScanAll()
     }
-
-    invoke('cleanup_stale_cache').then(() => {
-        backgroundScanAll()
-    }).catch(() => {})
 
     return {
         folders, folderTrees, selectedFolderPath, selectedFolder, audioFiles, isScanning, scanProgress,

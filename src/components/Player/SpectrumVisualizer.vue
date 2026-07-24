@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../../stores/player'
 
 const playerStore = usePlayerStore()
@@ -13,7 +13,7 @@ function refreshAccentColor() {
 }
 
 watch(() => playerStore.currentTrack?.coverUrl, () => {
-    setTimeout(refreshAccentColor, 100)
+    nextTick(refreshAccentColor)
 })
 
 onMounted(() => {

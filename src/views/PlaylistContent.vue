@@ -104,7 +104,7 @@ const menuItems = computed<MenuItem[]>(() => {
                     @dblclick="playPlaylist(index)"
                     @contextmenu="onTrackContextMenu($event, track.path)"
                 >
-                    <span class="track-index">{{ index + 1 }}</span>
+                    <span class="track-index">{{ track.position + 1 }}</span>
                     <span class="track-title">{{ track.title || stripExtension(track.file_name) }}</span>
                     <span class="track-duration">{{ formatTime(track.duration) }}</span>
                 </div>

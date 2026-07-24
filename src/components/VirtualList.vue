@@ -34,14 +34,20 @@ const offsetY = computed(() => startIndex.value * props.itemHeight)
 const visibleItems = computed(() => 
     props.items.slice(startIndex.value, endIndex.value).map((item, i) => ({
         item,
-        index: startIndex.value + i
+        index: startIndex.value + i,
     }))
 )
 
+let rafId: number | null = null
+
 function onScroll() {
-    if (container.value) {
-        scrollTop.value = container.value.scrollTop
-    }
+    if (rafId !== null) return
+    rafId = requestAnimationFrame(() => {
+        if (container.value) {
+            scrollTop.value = container.value.scrollTop
+        }
+        rafId = null
+    })
 }
 
 function updateHeight() {

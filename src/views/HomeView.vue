@@ -35,7 +35,9 @@ const displayFiles = computed(() => {
     const q = localSearch.value.toLowerCase()
     return files.filter(f => {
         const title = (f.title || stripExtension(f.fileName)).toLowerCase()
-        return title.includes(q)
+        const artist = (f.artist || '').toLowerCase()
+        const album = (f.album || '').toLowerCase()
+        return title.includes(q) || artist.includes(q) || album.includes(q)
     })
 })
 
@@ -121,7 +123,7 @@ function scrollToPlaying(smooth = false) {
     if (!playerStore.currentTrack) return
     if (virtualListRef.value) {
         const idx = flatItems.value.findIndex(
-            item => item.type === 'track' && item.file.path === playerStore.currentTrack?.path
+            item => item.type === 'track' && item.file.path === playerStore.currentTrack!.path
         )
         if (idx >= 0) {
             virtualListRef.value.scrollToIndex(idx, smooth ? 'smooth' : 'auto')
@@ -200,7 +202,7 @@ onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewC
                 <p class="empty-text">{{ showingGlobalSearch ? '未找到匹配的音乐' : '没有找到音频文件' }}</p>
             </div>
 
-            <div v-if="libraryStore.isScanning && displayFiles.length > 0" class="sacn-progress-bar">
+            <div v-if="libraryStore.isScanning && displayFiles.length > 0" class="scan-progress-bar">
                 {{ libraryStore.scanProgress }}
             </div>
 

@@ -2,10 +2,6 @@
 
 一款轻量级本地音乐播放器.
 
-## 下载
-
-[下载链接](https://github.com/dzheming/abel-music-player/releases)
-
 ## 特性
 
 - **本地播放** — 支持播放本地 MP3 FLAC WAV OGG AAC M4A WMA等文件
