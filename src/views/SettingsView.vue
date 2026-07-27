@@ -87,6 +87,19 @@ async function refreshLibrary() {
             <h3 class="section-title">系统</h3>
             <div class="setting-item">
                 <div class="setting-info">
+                    <span class="setting-label">播放中不息屏</span>
+                    <span class="setting-desc">播放时阻止系统休眠和显示器关闭</span>
+                </div>
+                <button
+                    class="setting-toggle"
+                    :class="{ active: settingsStore.preventSleep }"
+                    @click="settingsStore.togglePreventSleep()"
+                >
+                    <span class="toggle-knob"></span>
+                </button>
+            </div>
+            <div class="setting-item">
+                <div class="setting-info">
                     <span class="setting-label">最小化到托盘</span>
                     <span class="setting-desc">点击关闭按钮时最小化到系统托盘</span>
                 </div>

@@ -28,11 +28,14 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 rayon = "1"
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Registry"] }
+windows-sys = { version = "0.61", features = ["Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_System_Threading", "Win32_System_Registry", "Win32_System_Power"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+objc2 = "0.6"
 
 [profile.release]
-strip = "symbols"
+strip = true
 lto = true
 opt-level = "s"
 codegen-units = 1
-debug = false

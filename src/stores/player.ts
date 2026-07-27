@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { LoopMode } from '../types'
 import { useEqualizer, EQ_FREQUENCIES } from '../composables/useEqualizer'
+import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
 import { extractDominantColor } from '../utils/extract-color'
 import type { AudioFile } from '../types'
@@ -66,8 +67,16 @@ export const usePlayerStore = defineStore('player', () => {
     audio.addEventListener('ended', () => {
         handleTrackEnd()
     })
-    audio.addEventListener('play', () => { isPlaying.value = true })
-    audio.addEventListener('pause', () => { isPlaying.value = false })
+    audio.addEventListener('play', () => { 
+        isPlaying.value = true 
+        if (useSettingsStore().preventSleep) {
+            invoke('prevent_sleep').catch(() => {})
+        }
+    })
+    audio.addEventListener('pause', () => { 
+        isPlaying.value = false 
+        invoke('allow_sleep').catch(() => {})
+    })
 
     audio.volume = volume.value
     let volumeSaveTimer: ReturnType<typeof setTimeout> | null = null

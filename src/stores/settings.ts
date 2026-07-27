@@ -14,6 +14,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const accentColor = ref('#007aff')
     const closeToTray = ref(true)
     const mediaKeysEnabled = ref(true)
+    const preventSleep = ref(false)
     const viewMode = ref<'list' | 'card'>('list')
 
     invoke('get_setting', { key: 'close-to-tray' }).then(v => {
@@ -21,6 +22,9 @@ export const useSettingsStore = defineStore('settings', () => {
     }).catch(() => {})
     invoke('get_setting', { key: 'media-keys' }).then(v => {
         if (v) mediaKeysEnabled.value = v !== 'false'
+    }).catch(() => {})
+    invoke('get_setting', { key: 'prevent-sleep' }).then(v => {
+        if (v) preventSleep.value = v === 'true'
     }).catch(() => {})
     invoke('get_setting', { key: 'view-mode' }).then(v => {
         if (v) viewMode.value = v as 'list' | 'card'
@@ -71,6 +75,11 @@ export const useSettingsStore = defineStore('settings', () => {
         invoke('set_setting', { key: 'media-keys', value: String(mediaKeysEnabled.value) }).catch(() => {})
     }
 
+    function togglePreventSleep() {
+        preventSleep.value = !preventSleep.value
+        invoke('set_setting', { key: 'prevent-sleep', value: String(preventSleep.value) }).catch(() => {})
+    }
+
     function toggleViewMode() {
         viewMode.value = viewMode.value === 'list' ? 'card' : 'list'
         invoke('set_setting', { key: 'view-mode', value: viewMode.value }).catch(() => {})
@@ -80,7 +89,7 @@ export const useSettingsStore = defineStore('settings', () => {
     loadSystemAccentColor()
 
     return { 
-        theme, accentColor, closeToTray, mediaKeysEnabled, viewMode,
-        toggleTheme, toggleCloseToTray, toggleMediaKeys, toggleViewMode, loadSystemAccentColor,
+        theme, accentColor, closeToTray, mediaKeysEnabled, preventSleep, viewMode,
+        toggleTheme, toggleCloseToTray, toggleMediaKeys, togglePreventSleep, toggleViewMode, loadSystemAccentColor,
     }
 })

@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::Power::{
+    SetThreadExecutionState, ES_CONTINUOUS, ES_DISPLAY_REQUIRED, ES_SYSTEM_REQUIRED,
+};
 
 use super::portable::get_portable_dir;
 
@@ -123,4 +127,69 @@ pub fn reset_taskbar_icon(app: AppHandle) -> Result<(), String> {
     let icon = tauri::image::Image::new_owned(rgba.into_raw(), width, height);
     window.set_icon(icon).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+mod power_macos {
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static ASSERTION_ID: AtomicU32 = AtomicU32::new(0);
+
+    extern "C" {
+        fn IOPMAssertionCreateWithName(
+            assertion_type: *const std::ffi::c_void,
+            level: u32,
+            reason: *const std::ffi::c_void,
+            assertion_id: *mut u32,
+        ) -> i32;
+        fn IOPMAssertionRelease(assertion_id: u32) -> i32;
+    }
+
+    pub fn prevent() {
+        use core_foundation::string::CFString;
+        use core_foundation::base::TCFType;
+
+        let assertion_type = CFString::new("PreventUserIdleDisplaySleep");
+        let reason = CFString::new("Audio playback");
+        let mut assertion_id: u32 = 0;
+
+        unsafe {
+            IOPMAssertionCreateWithName(
+                assertion_type.as_concrete_TypeRef() as *const _,
+                255, // kIOPMAssertionLevelOn
+                reason.as_concrete_TypeRef() as *const _,
+                &mut assertion_id,
+            );
+        }
+        ASSERTION_ID.store(assertion_id, Ordering::Relaxed);
+    }
+
+    pub fn allow() {
+        let id = ASSERTION_ID.swap(0, Ordering::Relaxed);
+        if id != 0 {
+            unsafe { IOPMAssertionRelease(id); }
+        }
+    }
+}
+
+#[tauri::command]
+pub fn prevent_sleep() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED);
+    }
+
+    #[cfg(target_os = "macos")]
+    power_macos::prevent();
+}
+
+#[tauri::command]
+pub fn allow_sleep() {
+    #[cfg(target_os = "windows")]
+    unsafe {
+        SetThreadExecutionState(ES_CONTINUOUS);
+    }
+
+    #[cfg(target_os = "macos")]
+    power_macos::allow();
 }

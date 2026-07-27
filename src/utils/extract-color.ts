@@ -5,7 +5,7 @@ function complementary(r: number, g: number, b: number): [number, number, number
     l = (max + min) / 2
 
     if (max === min) {
-        h = 0, s = 0
+        h = 0; s = 0
     } else {
         const d = max - min
         s = l > 0.5 ? d / (2 - max - min) : d / (max + min)

@@ -13,7 +13,7 @@ use commands::metadata::{read_cover, read_metadata, read_metadata_batch};
 use commands::portable::get_portable_dir;
 use commands::scanner::{scan_folder_files, scan_folder_tree, scan_music_folder};
 use commands::theme::get_system_accent_color;
-use commands::window::{reset_taskbar_icon, restore_window_state, save_window_state, set_taskbar_icon};
+use commands::window::{allow_sleep, prevent_sleep, reset_taskbar_icon, restore_window_state, save_window_state, set_taskbar_icon};
 
 use std::sync::Mutex;
 use tauri::{
@@ -63,7 +63,9 @@ pub fn run() {
             search_tracks,
             get_setting,
             set_setting,
-            get_random_tracks
+            get_random_tracks,
+            prevent_sleep,
+            allow_sleep
         ])
         .setup(|app| {
             let conn = init_db();
