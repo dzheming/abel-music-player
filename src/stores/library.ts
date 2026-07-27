@@ -161,33 +161,45 @@ export const useLibraryStore = defineStore('library', () => {
         isScanning.value = true
         scanProgress.value = '正在扫描文件...'
         audioFiles.value = []
+
         try {
             const files: string[] = await invoke('scan_music_folder', { path })
             if (myGen !== scanGeneration) return
-            scanProgress.value = `发现 ${files.length} 个音频文件,加载中...`
+            scanProgress.value = `发现 ${files.length} 个文件,加载中...`
 
-            const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
-            if (myGen !== scanGeneration) return
-            const cachedPaths = new Set(cached.map(c => c.path))
+            const uncachedPaths: string[] = []
+            const BATCH = 200
+            for (let i = 0; i < files.length; i += BATCH) {
+                if (myGen !== scanGeneration) return
+                const batch = files.slice(i, i + BATCH)
+                const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: batch })
+                if (myGen !== scanGeneration) return
+                const cachedPaths = new Set(cached.map(c => c.path))
+    
+                if (cached.length > 0) {
+                    const tracks = cached.map(c => ({
+                        path: c.path,
+                        fileName: c.file_name,
+                        title: c.title || undefined,
+                        artist: c.artist || undefined,
+                        album: c.album || undefined,
+                        duration: c.duration,
+                        trackNumber: c.track_number || undefined,
+                    }))
+                    audioFiles.value = [ ...audioFiles.value, ...tracks ]
+                }
 
-            if (cached.length > 0) {
-                audioFiles.value = cached.map(c => ({
-                    path: c.path,
-                    fileName: c.file_name,
-                    title: c.title || undefined,
-                    artist: c.artist || undefined,
-                    album: c.album || undefined,
-                    duration: c.duration,
-                    trackNumber: c.track_number || undefined,
-                }))
+                for (const p of batch) {
+                    if (!cachedPaths.has(p)) uncachedPaths.push(p)
+                }
+                scanProgress.value = `已加载 ${audioFiles.value.length} / ${files.length} 首...`
             }
 
-            const uncachedPaths = files.filter(f => !cachedPaths.has(f))
 
             if (uncachedPaths.length > 0) {
                 scanProgress.value = `正在读取 ${uncachedPaths.length} 首歌曲元数据...`
 
-                const unlisten = await listen<RawMetadata[]>('metadata-batch-chunk', (event) => {
+                const unlistenMeta = await listen<RawMetadata[]>('metadata-batch-chunk', (event) => {
                     if (myGen !== scanGeneration) return
                     const chunk = event.payload.map(m => ({
                         path: m.path,
@@ -232,7 +244,7 @@ export const useLibraryStore = defineStore('library', () => {
                     }))
                     invoke('cache_tracks', { tracks: cacheData }).catch(() => {})
                 } finally {
-                    unlisten()
+                    unlistenMeta()
                 }
             }
         } catch (e) {
