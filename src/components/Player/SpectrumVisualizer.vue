@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '../../stores/player'
 
 const playerStore = usePlayerStore()
@@ -7,14 +7,12 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let animationId: number | null = null
 let analyser: AnalyserNode | null = null
 let accentColor = '#0a84ff'
+let frameCount = 0
 
 function refreshAccentColor() {
     accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#0a84ff'
+    frameCount = 0
 }
-
-watch(() => playerStore.currentTrack?.coverUrl, () => {
-    nextTick(refreshAccentColor)
-})
 
 onMounted(() => {
     try {
@@ -32,6 +30,8 @@ onUnmounted(() => {
 
 function draw() {
     animationId = requestAnimationFrame(draw)
+
+    if (++frameCount % 30 === 0) refreshAccentColor()
 
     if (!canvasRef.value || !analyser) return
 

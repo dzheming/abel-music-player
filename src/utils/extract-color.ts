@@ -1,3 +1,44 @@
+function complementary(r: number, g: number, b: number): [number, number, number] {
+    let h: number, s: number, l: number
+    const rf = r / 255, gf = g / 255, bf = b / 255
+    const max = Math.max(rf, gf, bf), min = Math.min(rf, gf, bf)
+    l = (max + min) / 2
+
+    if (max === min) {
+        h = 0, s = 0
+    } else {
+        const d = max - min
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+        if (max === rf) h = ((gf -bf) / d + (gf < bf ? 6 : 0)) / 6
+        else if (max === gf) h = ((bf -rf) / d + 2) / 6
+        else h = ((rf - gf) / d + 4) / 6
+    }
+
+    h = (h + 0.5) % 1.0
+
+    const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1
+        if (t > 1) t -= 1
+        if (t < 1 / 6) return p + (q - p) * 6 * t
+        if (t < 1 / 2) return q
+        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+        return p
+    }
+
+    let ro: number, go: number, bo: number
+    if (s === 0) {
+        ro = go = bo = l
+    } else {
+        const q = l < 0.5 ? l * (1 + s) : l + s -l * s
+        const p = 2 * l - q
+        ro = hue2rgb(p, q, h + 1 / 3)
+        go = hue2rgb(p, q, h)
+        bo = hue2rgb(p, q, h - 1 / 3)
+    }
+
+    return [Math.round(ro * 255), Math.round(go * 255), Math.round(bo * 255)]
+}
+
 export function extractDominantColor(imageUrl: string): Promise<string | null> {
     return new Promise((resolve) => {
         const img = new Image()
@@ -50,9 +91,10 @@ export function extractDominantColor(imageUrl: string): Promise<string | null> {
                 if (bucket.count > best.count) best = bucket
             }
 
-            const r = Math.round(best.r / best.count)
-            const g = Math.round(best.g / best.count)
-            const b = Math.round(best.b / best.count)
+            const avgR = Math.round(best.r / best.count)
+            const avgG = Math.round(best.g / best.count)
+            const avgB = Math.round(best.b / best.count)
+            const [r, g, b] = complementary(avgR, avgG, avgB)
             resolve(`#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`)
         }
         img.onerror = () => resolve(null)
