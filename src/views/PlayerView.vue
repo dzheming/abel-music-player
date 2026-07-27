@@ -276,7 +276,7 @@ const coverGradient = computed(() => {
 .cover-section {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
 }
 
 .cover-large {
