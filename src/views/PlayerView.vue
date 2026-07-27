@@ -259,7 +259,7 @@ const coverGradient = computed(() => {
     grid-template-columns: 31fr 69fr;
     grid-template-rows: auto 1fr;
     align-items: center;
-    gap: 16px 32px;
+    gap: 16px 1px;
     min-height: 0;
     position: relative;
     z-index: 1;
