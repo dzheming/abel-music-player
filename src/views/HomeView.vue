@@ -244,7 +244,7 @@ onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewC
             </VirtualList>
 
             <!-- Card view -->
-            <div v-else-if="displayFiles.length > 0 && settingsStore.viewMode === 'card'" class="music-grid-view">
+            <div v-else-if="displayFiles.length > 0" class="music-grid-view">
                 <template v-for="group in groupedFiles" :key="group.dir">
                     <div class="dir-separator" @click="toggleDir(group.dir)">
                         <span class="dir-arrow" :class="{ collapsed: collapsedDirs.has(group.dir) }">&#9662;</span>

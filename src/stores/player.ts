@@ -65,6 +65,9 @@ export const usePlayerStore = defineStore('player', () => {
         duration.value = audio.duration
     })
     audio.addEventListener('ended', () => {
+        if (useSettingsStore().preventSleep) {
+            invoke('allow_sleep').catch(() => {})
+        }
         handleTrackEnd()
     })
     audio.addEventListener('play', () => { 
@@ -75,7 +78,9 @@ export const usePlayerStore = defineStore('player', () => {
     })
     audio.addEventListener('pause', () => { 
         isPlaying.value = false 
-        invoke('allow_sleep').catch(() => {})
+        if (useSettingsStore().preventSleep) {
+            invoke('allow_sleep').catch(() => {})
+        }
     })
 
     audio.volume = volume.value

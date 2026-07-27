@@ -10,7 +10,6 @@ dependencies = [
  "core-foundation 0.10.1",
  "image",
  "lofty",
- "objc2",
  "rayon",
  "reqwest 0.12.28",
  "rusqlite",

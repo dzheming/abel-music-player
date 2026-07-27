@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, triggerRef } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -186,7 +186,8 @@ export const useLibraryStore = defineStore('library', () => {
                         duration: c.duration,
                         trackNumber: c.track_number || undefined,
                     }))
-                    audioFiles.value = [ ...audioFiles.value, ...tracks ]
+                    audioFiles.value.push(...tracks)
+                    triggerRef(audioFiles)
                 }
 
                 for (const p of batch) {

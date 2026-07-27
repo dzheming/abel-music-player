@@ -153,15 +153,23 @@ mod power_macos {
         let reason = CFString::new("Audio playback");
         let mut assertion_id: u32 = 0;
 
-        unsafe {
+        let ret = unsafe {
             IOPMAssertionCreateWithName(
                 assertion_type.as_concrete_TypeRef() as *const _,
                 255, // kIOPMAssertionLevelOn
                 reason.as_concrete_TypeRef() as *const _,
                 &mut assertion_id,
-            );
+            )
+        };
+        if ret != 0 {
+            eprintln!("[power] IOPMAssertionCreateWithName failed: {}", ret);
+            return;
         }
-        ASSERTION_ID.store(assertion_id, Ordering::Relaxed);
+
+        let old = ASSERTION_ID.swap(assertion_id, Ordering::Relaxed);
+        if old != 0 {
+            unsafe { IOPMAssertionRelease(old); }
+        }
     }
 
     pub fn allow() {
