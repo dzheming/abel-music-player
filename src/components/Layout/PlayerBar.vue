@@ -6,7 +6,7 @@ import { generateGradient } from '../../utils/cover-gradient'
 import ProgressBar from '../Player/ProgressBar.vue'
 import PlayControls from '../Player/PlayControls.vue'
 import VolumeControl from '../Player/VolumeControl.vue'
-import Equalizer from '../Player/Equalizer.vue'
+import EffectsPanel from '../Player/EffectsPanel.vue'
 
 const emit = defineEmits<{ openPlayer: [], openTimeView: [] }>()
 const playerStore = usePlayerStore()
@@ -78,7 +78,7 @@ const coverGradient = computed(() => {
                         title="均衡器"
                     >EQ</button>
                     <div v-if="showEq" ref="eqPanelRef" class="eq-panel">
-                        <Equalizer />
+                        <EffectsPanel />
                     </div>
                 </div>
                 <button class="expand-btn" @click="emit('openTimeView')" title="展开播放页">

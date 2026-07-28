@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { LoopMode } from '../types'
 import { useEqualizer, EQ_FREQUENCIES } from '../composables/useEqualizer'
+import { useAudioEffects } from '../composables/useAudioEffects'
 import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
 import { extractDominantColor } from '../utils/extract-color'
@@ -49,6 +50,7 @@ export const usePlayerStore = defineStore('player', () => {
     const isRestoringState = ref(true)
 
     const eq = useEqualizer()
+    const effects = useAudioEffects()
 
     const currentTrack = computed(() => 
         currentIndex.value >= 0 ? playlist.value[currentIndex.value] : null
@@ -164,25 +166,52 @@ export const usePlayerStore = defineStore('player', () => {
         playTrackAt(startIndex)
     }
 
+    let fadeOutTimer: ReturnType<typeof setTimeout> | null = null
+
     function playTrackAt(index: number) {
         if (index < 0 || index >= playlist.value.length) return
-        currentIndex.value = index
-        const track = playlist.value[index]
-        audio.src = convertFileSrc(track.path)
-        audio.play()
-        savePlayState()
+        initAudioContext()
 
-        if (track.coverUrl) {
-            updateTaskbarIcon(track.coverUrl)
-            updateMediaSession(track)
+        if (fadeOutTimer) { clearTimeout(fadeOutTimer); fadeOutTimer = null }
+
+        const wasPlaying = isPlaying.value && audio.src
+        const startNewTrack = () => {
+            currentIndex.value = index
+            const track = playlist.value[index]
+            audio.src = convertFileSrc(track.path)
+            audio.play()
+            savePlayState()
+
+            if (fadeGainNode && audioContext) {
+                fadeGainNode.gain.cancelScheduledValues(audioContext.currentTime)
+                fadeGainNode.gain.setValueAtTime(0, audioContext.currentTime)
+                fadeGainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + FADE_IN_DURATION)
+            }
+    
+            if (track.coverUrl) {
+                updateTaskbarIcon(track.coverUrl)
+                updateMediaSession(track)
+            } else {
+                invoke<string | null>('read_cover', { path: track.path }).then(cover => {
+                    if (cover && playlist.value[index]) {
+                        playlist.value[index].coverUrl = cover
+                        updateTaskbarIcon(cover)
+                        updateMediaSession(playlist.value[index])
+                    }
+                }).catch(() => {})
+            }
+        }
+
+        if (wasPlaying && fadeGainNode && audioContext) {
+            fadeGainNode.gain.cancelScheduledValues(audioContext.currentTime)
+            fadeGainNode.gain.setValueAtTime(fadeGainNode.gain.value, audioContext.currentTime)
+            fadeGainNode.gain.linearRampToValueAtTime(0, audioContext.currentTime + FADE_OUT_DURATION)
+            fadeOutTimer = setTimeout(() => {
+                fadeOutTimer = null
+                startNewTrack()
+            }, FADE_OUT_DURATION * 1000)
         } else {
-            invoke<string | null>('read_cover', { path: track.path }).then(cover => {
-                if (cover && playlist.value[index]) {
-                    playlist.value[index].coverUrl = cover
-                    updateTaskbarIcon(cover)
-                    updateMediaSession(playlist.value[index])
-                }
-            }).catch(() => {})
+            startNewTrack()
         }
     }
 
@@ -325,12 +354,28 @@ export const usePlayerStore = defineStore('player', () => {
 
     let audioContext: AudioContext | null = null
     let analyser: AnalyserNode | null = null
+    let fadeGainNode: GainNode | null = null
+    const FADE_OUT_DURATION = 0.3
+    const FADE_IN_DURATION = 0.5
+
+    function createImpulseResponse(ctx: AudioContext, decay: number): AudioBuffer {
+        const length = Math.floor(ctx.sampleRate * decay)
+        const buffer = ctx.createBuffer(2, length, ctx.sampleRate)
+        for (let ch = 0; ch < 2; ch++) {
+            const data = buffer.getChannelData(ch)
+            for (let i = 0; i < length; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay)
+            }
+        }
+        return buffer
+    }
 
     function initAudioContext() {
         if (audioContext) return
         audioContext = new AudioContext()
         analyser = audioContext.createAnalyser()
         analyser.fftSize = 512
+        fadeGainNode = audioContext.createGain()
 
         const source = audioContext.createMediaElementSource(audio)
 
@@ -348,10 +393,50 @@ export const usePlayerStore = defineStore('player', () => {
             prev.connect(filter)
             prev = filter
         }
-        prev.connect(analyser)
+
+        const bassFilter = audioContext.createBiquadFilter()
+        bassFilter.type = 'lowshelf'
+        bassFilter.frequency.value = 150
+        bassFilter.gain.value = 0
+
+        const vocalFilter = audioContext.createBiquadFilter()
+        vocalFilter.type = 'peaking'
+        vocalFilter.frequency.value = 2500
+        vocalFilter.Q.value = 1.2
+        vocalFilter.gain.value = 0
+
+        const stereoPanner = audioContext.createStereoPanner()
+        stereoPanner.pan.value = 0
+
+        const convolverNode = audioContext.createConvolver()
+        convolverNode.buffer = createImpulseResponse(audioContext, 2)
+
+        const dryGain = audioContext.createGain()
+        dryGain.gain.value = 1
+
+        const wetGain = audioContext.createGain()
+        wetGain.gain.value = 0
+
+        const reverbMerge = audioContext.createGain()
+
+        prev.connect(bassFilter)
+        bassFilter.connect(vocalFilter)
+        vocalFilter.connect(stereoPanner)
+
+        stereoPanner.connect(dryGain)
+        stereoPanner.connect(convolverNode)
+        convolverNode.connect(wetGain)
+
+        dryGain.connect(reverbMerge)
+        wetGain.connect(reverbMerge)
+
+        reverbMerge.connect(fadeGainNode)
+        fadeGainNode.connect(analyser)
         analyser.connect(audioContext.destination)
 
         eq.setFilters(filters)
+        effects.setAudio(audio)
+        effects.setNodes({ stereoPanner, bassFilter, vocalFilter, convolverNode, wetGain, dryGain, audioContext })
     }
 
     function getAnalyser(): AnalyserNode {
@@ -390,7 +475,12 @@ export const usePlayerStore = defineStore('player', () => {
         playlist, currentIndex, isPlaying, isRestoringState, currentTime, duration, volume, shuffle, loopMode,
         currentTrack, progress,
         eqGains: eq.eqGains, eqEnabled: eq.eqEnabled, EQ_FREQUENCIES, eqPreset: eq.eqPreset,
+        playbackSpeed: effects.playbackSpeed, stereoBalance: effects.stereoBalance,
+        reverbMix: effects.reverbMix, bassBoost: effects.bassBoost, vocalBoost: effects.vocalBoost,
         setPlaylist, appendTracks, playTrackAt, togglePlay, stop, next, prev, seek, setVolume,
         toggleShuffle, cycleLoopMode, getAnalyser, setEqGain, toggleEq, resetEq, setEqPreset,
+        setPlaybackSpeed: effects.setPlaybackSpeed, setStereoBalance: effects.setStereoBalance,
+        setReverbMix: effects.setReverbMix, setBassBoost: effects.setBassBoost,
+        setVocalBoost: effects.setVocalBoost, resetEffects: effects.reset,
     }
 })

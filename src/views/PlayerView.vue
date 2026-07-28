@@ -8,7 +8,7 @@ import SpectrumVisualizer from '../components/Player/SpectrumVisualizer.vue'
 import PlayControls from '../components/Player/PlayControls.vue'
 import ProgressBar from '../components/Player/ProgressBar.vue'
 import VolumeControl from '../components/Player/VolumeControl.vue'
-import Equalizer from '../components/Player/Equalizer.vue'
+import EffectsPanel from '../components/Player/EffectsPanel.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
@@ -124,7 +124,7 @@ const coverGradient = computed(() => {
                             @click="toggleEqPanel"
                         >EQ</button>
                         <div v-if="showEq" ref="eqPanelRef" class="eq-panel">
-                            <Equalizer />
+                            <EffectsPanel />
                         </div>
                     </div>
                 </div>
