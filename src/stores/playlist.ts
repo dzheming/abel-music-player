@@ -135,6 +135,11 @@ export const usePlaylistStore = defineStore('playlist', () => {
         if (!defaultPlaylistId.value) await ensureDefaultPlaylist()
         if (defaultPlaylistId.value) {
             await addToPlaylist(defaultPlaylistId.value, paths)
+            playingPlaylistId.value = defaultPlaylistId.value
+            if (currentPlaylistId.value !== defaultPlaylistId.value) {
+                invoke('set_setting', { key: 'playing-playlist-id', value: JSON.stringify(defaultPlaylistId.value) }).catch(() => {})
+                await selectPlaylist(defaultPlaylistId.value)
+            }
         }
     }
 
