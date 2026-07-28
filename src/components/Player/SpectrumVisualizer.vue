@@ -57,7 +57,7 @@ function draw() {
     analyser.getByteFrequencyData(dataArray)
 
     const startX = width * 0.04
-    const availableWidth = width * 0.92
+    const availableWidth = width * 0.96
     const barCount = Math.min(Math.floor(availableWidth / 6), bufferLength)
     const totalUnit = availableWidth / barCount
     const barWidth = totalUnit * 0.65
@@ -66,6 +66,7 @@ function draw() {
     for (let i = 0; i < barCount; i++) {
         const barHeight = (dataArray[i] / 255) * height * 0.85
         const x = startX + i * (barWidth + gap)
+        if (x > availableWidth) break
         if (barHeight < 1) continue
         const y = height - barHeight
 
