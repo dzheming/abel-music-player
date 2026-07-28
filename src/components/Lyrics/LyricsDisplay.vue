@@ -214,6 +214,7 @@ function scrollToLine(index: number) {
     color: rgba(255, 255, 255, 0.1);
 }
 
+
 .lyrics-line.active {
     font-size: clamp(32px, 1.8vw, 64px);
     font-weight: 500;

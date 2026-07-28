@@ -34,7 +34,7 @@ function onEqClickOutside(e: MouseEvent) {
 
 function updateLyricsHeight() {
     if (coverRef.value) {
-        lyricsHeight.value = `${coverRef.value.clientHeight}px`
+        lyricsHeight.value = `${coverRef.value.clientHeight * 1.2}px`
     }
 }
 
@@ -109,18 +109,23 @@ const coverGradient = computed(() => {
             </div>
 
             <div class="player-view-footer">
-                <PlayControls />
-                <ProgressBar />
-                <VolumeControl />
-                <div class="eq-wrapper">
-                    <button 
-                        ref="eqBtnRef"
-                        class="eq-btn"
-                        :class="{ active: playerStore.eqEnabled }"
-                        @click="toggleEqPanel"
-                    >EQ</button>
-                    <div v-if="showEq" ref="eqPanelRef" class="eq-panel">
-                        <Equalizer />
+                <div class="spectrum-reflection">
+                    <SpectrumVisualizer />
+                </div>
+                <div class="footer-controls">
+                    <PlayControls />
+                    <ProgressBar />
+                    <VolumeControl />
+                    <div class="eq-wrapper">
+                        <button 
+                            ref="eqBtnRef"
+                            class="eq-btn"
+                            :class="{ active: playerStore.eqEnabled }"
+                            @click="toggleEqPanel"
+                        >EQ</button>
+                        <div v-if="showEq" ref="eqPanelRef" class="eq-panel">
+                            <Equalizer />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -175,7 +180,7 @@ const coverGradient = computed(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 24px;
+    padding: 4px 24px;
     flex-shrink: 0;
 }
 
@@ -223,7 +228,6 @@ const coverGradient = computed(() => {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 0 48px;
     min-height: 0;
     position: relative;
 }
@@ -258,8 +262,9 @@ const coverGradient = computed(() => {
     display: grid;
     grid-template-columns: 31fr 69fr;
     grid-template-rows: auto 1fr;
-    align-items: center;
+    align-items: start;
     gap: 16px 1px;
+    padding: 0 24px;
     min-height: 0;
     position: relative;
     z-index: 1;
@@ -286,6 +291,7 @@ const coverGradient = computed(() => {
     border-radius: var(--radius-lg);
     overflow: hidden;
     box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+    -webkit-box-reflect: below 4px linear-gradient(transparent 80%, rgba(255, 255, 255, 0.25));
 }
 
 .cover-img {
@@ -331,12 +337,28 @@ const coverGradient = computed(() => {
 }
 
 .player-view-footer {
+    position: relative;
+    flex-shrink: 0;
+    padding: 8px 48px 16px;
+}
+
+.spectrum-reflection {
+    position: absolute;
+    inset: 0;
+    transform: scaleY(-1);
+    opacity: 0.35;
+    mask-image: linear-gradient(to top, black 30%, transparent);
+    -webkit-mask-image: linear-gradient(to top, black 30%, transparent);
+    pointer-events: none;
+}
+
+.footer-controls {
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 24px;
-    padding: 8px 48px 16px;
-    flex-shrink: 0;
 }
 
 .player-view-footer :deep(.control-btn) {

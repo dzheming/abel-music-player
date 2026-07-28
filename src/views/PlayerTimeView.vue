@@ -72,7 +72,7 @@ const coverGradient = computed(() => {
                 <div class="time-section">
                     <span class="time-hours">{{ timeH }}</span>
                     <span class="time-colon">:</span>
-                    <span class="time-minutes">{{ timeM }}<span class="time-seconds">:{{ timeS }}</span></span>
+                    <span class="time-minutes">{{ timeM }}</span>
                 </div>
 
                 <div class="lyrics-section">
@@ -136,7 +136,7 @@ const coverGradient = computed(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 24px;
+    padding: 4px 24px;
     flex-shrink: 0;
 }
 
@@ -194,8 +194,8 @@ const coverGradient = computed(() => {
     justify-content: center;
     font-family: 'TimeFont';
     font-size: clamp(160px, 12vw, 240px);
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: 600;
+    line-height: 1;
     color: rgba(255, 255, 255, 0.9);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.1em;
@@ -204,23 +204,19 @@ const coverGradient = computed(() => {
 .time-hours {
     flex: 1;
     text-align: right;
+    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .time-colon {
-    padding: 0 0.1em;
+    font-weight: 100;
+    padding: 0 0.2em;
+    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .time-minutes {
     flex: 1;
     text-align: left;
-}
-
-.time-seconds {
-    font-size: 0.333em;
-    line-height: 0.8;
-    font-weight: 300;
-    letter-spacing: 0.01em;
-    color: rgba(255, 255, 255, 0.5);
+    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .lyrics-section {
