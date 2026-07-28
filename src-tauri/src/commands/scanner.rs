@@ -68,6 +68,7 @@ fn build_folder_node(dir: &Path) -> FolderNode {
             if entry_path.is_dir() {
                 let child = build_folder_node(&entry_path);
                 if child.audio_count > 0 || !child.children.is_empty() {
+                    audio_count += child.audio_count;
                     children.push(child);
                 }
             } else if entry_path.is_file() {
