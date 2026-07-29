@@ -99,7 +99,10 @@ pub async fn read_metadata_batch(app: AppHandle, paths: Vec<String>) -> Vec<Trac
         let chunk_owned: Vec<String> = chunk.to_vec();
         let results = match tokio::task::spawn_blocking(move || {
             chunk_owned.par_iter()
-                .filter_map(|p| read_metadata_inner(p, false))
+                .map(|p| read_metadata_inner(p, false))
+                .collect::<Vec<_>>()
+                .into_iter()
+                .flatten()
                 .collect::<Vec<_>>()
         }).await {
             Ok(r) => r,

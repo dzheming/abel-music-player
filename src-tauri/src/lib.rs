@@ -3,7 +3,7 @@ mod commands;
 use commands::database::{
     init_db, DbState,
     create_playlist, delete_playlist, rename_playlist, get_playlists,
-    add_to_playlist, remove_from_playlist, clear_playlist, get_playlist_tracks,
+    add_to_playlist, remove_from_playlist, clear_playlist, remove_tracks_by_folder, get_playlist_tracks,
     cache_tracks, get_cached_tracks_for_paths, clear_track_cache, cleanup_stale_cache,
     get_artists, get_albums, get_tracks_by_artist, get_tracks_by_album,
     search_tracks, get_setting, set_setting, get_random_tracks,
@@ -51,6 +51,7 @@ pub fn run() {
             add_to_playlist,
             remove_from_playlist,
             clear_playlist,
+            remove_tracks_by_folder,
             get_playlist_tracks,
             cache_tracks,
             get_cached_tracks_for_paths,

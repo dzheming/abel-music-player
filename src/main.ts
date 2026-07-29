@@ -4,6 +4,7 @@ import router from './router'
 
 import App from './App.vue'
 import './assets/styles/global.css'
+import { useLibraryStore } from './stores/library'
 
 document.addEventListener('contextmenu', (e) => {
     const target = e.target as HTMLElement
@@ -12,6 +13,9 @@ document.addEventListener('contextmenu', (e) => {
 })
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
 app.mount('#app')
+
+useLibraryStore().initLibrary()

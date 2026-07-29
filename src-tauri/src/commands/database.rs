@@ -1,3 +1,4 @@
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -155,7 +156,7 @@ pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State
     let max_pos: i64 = tx.query_row(
         "SELECT COALESCE(MAX(position), -1) FROM playlist_tracks WHERE playlist_id = ?1",
         &[&playlist_id], |row| row.get(0)
-    ).unwrap_or(-1);
+    ).map_err(|e| e.to_string())?;
 
     let mut pos = max_pos + 1;
     let mut added: u64 = 0;
@@ -204,6 +205,17 @@ pub fn clear_playlist(playlist_id: i64, state: tauri::State<'_, DbState>) -> Res
     conn.execute("DELETE FROM playlist_tracks WHERE playlist_id = ?1", params![playlist_id])
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub fn remove_tracks_by_folder(folder_path: String, state: tauri::State<'_, DbState>) -> Result<u64, String> {
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    let pattern = format!("{}%", folder_path);
+    let removed = conn.execute(
+        "DELETE FROM playlist_tracks WHERE path LIKE ?1",
+        params![pattern]
+    ).map_err(|e| e.to_string())?;
+    Ok(removed as u64)
 }
 
 #[tauri::command]
@@ -296,20 +308,26 @@ pub fn clear_track_cache(state: tauri::State<'_, DbState>) -> Result<(), String>
 pub fn cleanup_stale_cache(state: tauri::State<'_, DbState>) -> Result<u64, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn.prepare("SELECT path FROM track_cache").map_err(|e| e.to_string())?;
-    let paths: Vec<String> = stmt.query_map([], |row| row .get(0))
+    let paths: Vec<String> = stmt.query_map([], |row| row.get(0))
         .map_err(|e| e.to_string())?
         .filter_map(|r| r.ok())
         .collect();
 
-    let stale: Vec<&String> = paths.iter().filter(|p| !std::path::Path::new(p.as_str()).exists()).collect();
+    let stale: Vec<String> = paths.into_par_iter()
+        .filter(|p| !std::path::Path::new(p.as_str()).exists())
+        .collect();
     let count = stale.len() as u64;
 
-    for chunk in stale.chunks(500) {
-        let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!("DELETE FROM track_cache WHERE path IN ({})", placeholders);
-        let mut del_stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
-        let params: Vec<&dyn rusqlite::types::ToSql> = chunk.iter().map(|s| *s as &dyn rusqlite::types::ToSql).collect();
-        del_stmt.execute(params.as_slice()).map_err(|e| e.to_string())?;
+    if count > 0 {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        for chunk in stale.chunks(500) {
+            let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+            let sql = format!("DELETE FROM track_cache WHERE path IN ({})", placeholders);
+            let mut del_stmt = tx.prepare(&sql).map_err(|e| e.to_string())?;
+            let params: Vec<&dyn rusqlite::types::ToSql> = chunk.iter().map(|s| s as &dyn rusqlite::types::ToSql).collect();
+            del_stmt.execute(params.as_slice()).map_err(|e| e.to_string())?;
+        }
+        tx.commit().map_err(|e| e.to_string())?;
     }
 
     Ok(count)
@@ -363,14 +381,12 @@ pub fn get_albums(state: tauri::State<'_, DbState>) -> Result<Vec<AlbumGroup>, S
 #[tauri::command]
 pub fn get_tracks_by_artist(artist: String, state: tauri::State<'_, DbState>) -> Result<Vec<CachedTrack>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let query_artist = if artist == "未知歌手" { None } else { Some(artist.as_str()) };
     let mut stmt = conn.prepare(
         "SELECT path, file_name, title, artist, album, duration, track_number FROM track_cache 
         WHERE COALESCE(artist, '未知歌手') = ?1 
         ORDER BY album, track_number, title, file_name"
     ).map_err(|e| e.to_string())?;
-    let search_val = query_artist.unwrap_or("未知歌手");
-    let rows = stmt.query_map(params![search_val], |row| {
+    let rows = stmt.query_map(params![artist], |row| {
         Ok(CachedTrack {
             path: row.get(0)?,
             file_name: row.get(1)?,

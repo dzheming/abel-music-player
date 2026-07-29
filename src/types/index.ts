@@ -70,3 +70,13 @@ export interface AlbumGroup {
     artist?: string
     track_count: number
 }
+
+export interface CachedTrackData {
+    path: string
+    file_name: string
+    title: string | null
+    artist: string | null
+    album: string | null
+    duration: number
+    track_number: number | null
+}

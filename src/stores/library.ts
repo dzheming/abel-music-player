@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref, computed, triggerRef } from 'vue'
+import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
-import type { AudioFile, MusicFolder, FolderNode, RawMetadata } from '../types'
+import type { AudioFile, MusicFolder, FolderNode, RawMetadata, CachedTrackData } from '../types'
 
 export const useLibraryStore = defineStore('library', () => {
     const folders = ref<MusicFolder[]>([])
@@ -13,7 +13,11 @@ export const useLibraryStore = defineStore('library', () => {
         try {
             const foldersRaw = await invoke('get_setting', { key: 'music-folders' })
             if (foldersRaw) {
-                try { folders.value = JSON.parse(foldersRaw as string) } catch {}
+                try { 
+                    folders.value = JSON.parse(foldersRaw as string) 
+                } catch (e) {
+                    console.error('Failed to parse music folders:', e)
+                }
             }
             for (const folder of folders.value) {
                 loadFolderTree(folder.path)
@@ -23,14 +27,17 @@ export const useLibraryStore = defineStore('library', () => {
                 selectedFolderPath.value = selectedRaw as string
                 await loadFromCache(selectedRaw as string)
             }
-        } catch {}
+        } catch (e) {
+            console.error('Failed to init library:', e)
+        }
         
         try {
             await invoke('cleanup_stale_cache')
             await backgroundScanAll()
-        } catch {}
+        } catch (e) {
+            console.error('Background scan failed:', e)
+        }
     }
-    initLibrary()
     const audioFiles = ref<AudioFile[]>([])
     const isScanning = ref(false)
     const scanProgress = ref('')
@@ -62,6 +69,7 @@ export const useLibraryStore = defineStore('library', () => {
         folders.value = folders.value.filter(f => f.path !== path)
         folderTrees.value.delete(path)
         invoke('set_setting', { key: 'music-folders', value: JSON.stringify(folders.value) }).catch(() => {})
+        invoke('remove_tracks_by_folder', { folderPath: path }).catch(() => {})
         if (selectedFolderPath.value?.startsWith(path)) {
             selectedFolderPath.value = null
             invoke('set_setting', { key: 'selected-folder', value: '' }).catch(() => {})
@@ -84,16 +92,6 @@ export const useLibraryStore = defineStore('library', () => {
         globalSearchResults.value = []
         invoke('set_setting', { key: 'selected-folder', value: path }).catch(() => {})
         await loadFromCache(path)
-    }
-
-    interface CachedTrackData {
-        path: string
-        file_name: string
-        title: string | null
-        artist: string | null
-        album: string | null
-        duration: number
-        track_number: number | null
     }
 
     async function loadFromCache(path: string) {
@@ -149,7 +147,7 @@ export const useLibraryStore = defineStore('library', () => {
                     }
                 }
             } catch (e) {
-
+                console.error('Background scan failed for folder:', folder.path, e)
             }
         }
     }
@@ -187,7 +185,6 @@ export const useLibraryStore = defineStore('library', () => {
                         trackNumber: c.track_number || undefined,
                     }))
                     audioFiles.value.push(...tracks)
-                    triggerRef(audioFiles)
                 }
 
                 for (const p of batch) {
@@ -302,5 +299,6 @@ export const useLibraryStore = defineStore('library', () => {
         folders, folderTrees, selectedFolderPath, selectedFolder, audioFiles, isScanning, scanProgress,
         globalSearchQuery, globalSearchResults, isGlobalSearching,
         addFolder, removeFolder, loadFolderTree, selectFolder, globalSearch, clearGlobalSearch, refreshLibrary,
+        initLibrary,
     }
 })

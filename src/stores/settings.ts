@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { ThemeMode } from '../types'
+import { adjustBrightness } from '../utils/color'
 
 export const useSettingsStore = defineStore('settings', () => {
     function getSystemTheme(): ThemeMode {
@@ -37,14 +38,6 @@ export const useSettingsStore = defineStore('settings', () => {
     function applyAccentColor(color: string) {
         document.documentElement.style.setProperty('--color-accent', color)
         document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(color, -20))
-    }
-
-    function adjustBrightness(hex: string, amount: number): string {
-        const num = parseInt(hex.replace('#', ''), 16)
-        let r = Math.min(255, Math.max(0, ((num >> 16) & 0xff) + amount))
-        let g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount))
-        let b = Math.min(255, Math.max(0, (num & 0xff) + amount))
-        return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
     }
 
     function toggleTheme() {

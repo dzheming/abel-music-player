@@ -1,6 +1,10 @@
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
+
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
 
 fn save_lrc(audio_path: &str, content: &str) {
     let audio = Path::new(audio_path);
@@ -35,15 +39,14 @@ pub async fn download_lyrics(
     duration: f64,
     audio_path: String,
 ) -> Result<Option<String>, String> {
-    let client = reqwest::Client::new();
     let duration_secs = duration.round() as u64;
     
-    if let Some(lrc_content) = try_netease(&client, &title, &artist, &album).await {
+    if let Some(lrc_content) = try_netease(&CLIENT, &title, &artist, &album).await {
         save_lrc(&audio_path, &lrc_content);
         return Ok(Some(lrc_content));
     }
 
-    if let Some(lrc_content) = try_lrclib(&client, &title, &artist, &album, duration_secs).await {
+    if let Some(lrc_content) = try_lrclib(&CLIENT, &title, &artist, &album, duration_secs).await {
         save_lrc(&audio_path, &lrc_content);
         return Ok(Some(lrc_content));
     }
@@ -222,13 +225,12 @@ pub struct NeteaseSearchResult {
 
 #[tauri::command]
 pub async fn search_netease_lyrics(query: String, artist_filter: String) -> Result<Vec<NeteaseSearchResult>, String> {
-    let client = reqwest::Client::new();
     let search_url = format!(
         "https://music.163.com/api/search/get/web?s={}&type=1&limit=100",
         urlencoded(&query)
     );
 
-    let resp = client
+    let resp = CLIENT
         .post(&search_url)
         .header("User-Agent", "Mozilla/5.0")
         .header("Referer", "https://music.163.com/")
@@ -277,13 +279,12 @@ pub async fn search_netease_lyrics(query: String, artist_filter: String) -> Resu
 
 #[tauri::command]
 pub async fn fetch_netease_lyric(song_id: u64, audio_path: String) -> Result<Option<String>, String> {
-    let client = reqwest::Client::new();
     let lyric_url = format!(
         "https://music.163.com/api/song/lyric?id={}&lv=1",
         song_id
     );
 
-    let resp = client
+    let resp = CLIENT
         .get(&lyric_url)
         .header("User-Agent", "Mozilla/5.0")
         .header("Referer", "https://music.163.com/")
@@ -310,17 +311,5 @@ pub async fn fetch_netease_lyric(song_id: u64, audio_path: String) -> Result<Opt
 }
 
 fn urlencoded(s: &str) -> String {
-    let mut result = String::new();
-    for byte in s.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(byte as char);
-            }
-            b' ' => result.push('+'),
-            _ => {
-                result.push_str(&format!("%{:02X}", byte));
-            }
-        }
-    }
-    result
+    utf8_percent_encode(s, NON_ALPHANUMERIC).to_string().replace("%20", "+")
 }

@@ -6,23 +6,14 @@ import { useEqualizer, EQ_FREQUENCIES } from '../composables/useEqualizer'
 import { useAudioEffects } from '../composables/useAudioEffects'
 import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
+import { adjustBrightness } from '../utils/color'
 import { extractDominantColor } from '../utils/extract-color'
-import type { AudioFile } from '../types'
+import type { AudioFile, CachedTrackData } from '../types'
 
 interface SavedPlayState {
     paths: string[]
     currentIndex: number
     currentTime: number
-}
-
-interface CachedTrackData {
-    path: string
-    file_name: string
-    title: string | null
-    artist: string | null
-    album: string | null
-    duration: number
-    track_number: number | null
 }
 
 export const usePlayerStore = defineStore('player', () => {
@@ -72,17 +63,22 @@ export const usePlayerStore = defineStore('player', () => {
         }
         handleTrackEnd()
     })
+    let saveTimer: ReturnType<typeof setInterval> | null = null
     audio.addEventListener('play', () => { 
         isPlaying.value = true 
         if (useSettingsStore().preventSleep) {
             invoke('prevent_sleep').catch(() => {})
         }
+        if (saveTimer) clearInterval(saveTimer)
+        saveTimer = setInterval(savePlayState, 5000)
     })
     audio.addEventListener('pause', () => { 
         isPlaying.value = false 
         if (useSettingsStore().preventSleep) {
             invoke('allow_sleep').catch(() => {})
         }
+        if (saveTimer) { clearInterval(saveTimer); saveTimer = null }
+        savePlayState()
     })
 
     audio.volume = volume.value
@@ -150,16 +146,6 @@ export const usePlayerStore = defineStore('player', () => {
             console.error('Failed to restore play state:', e)
         }
     }
-
-    let saveTimer: ReturnType<typeof setInterval> | null = null
-    audio.addEventListener('play', () => {
-        if (saveTimer) clearInterval(saveTimer)
-            saveTimer = setInterval(savePlayState, 5000)
-    })
-    audio.addEventListener('pause', () => {
-        if (saveTimer) { clearInterval(saveTimer); saveTimer = null }
-        savePlayState()
-    })
 
     function setPlaylist(files: AudioFile[], startIndex = 0) {
         playlist.value = files
@@ -343,14 +329,6 @@ export const usePlayerStore = defineStore('player', () => {
             document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(systemAccentColor, -20))
         }
     })
-
-    function adjustBrightness(hex: string, amount: number): string {
-        const num = parseInt(hex.replace('#', ''), 16)
-        const r = Math.min(255, Math.max(0, ((num >> 16) & 0xff) + amount))
-        const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amount))
-        const b = Math.min(255, Math.max(0, (num & 0xff) + amount))
-        return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`
-    }
 
     let audioContext: AudioContext | null = null
     let analyser: AnalyserNode | null = null

@@ -86,10 +86,13 @@ pub fn restore_window_state(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// 显示器最大坐标值 (覆盖多屏 16K 分辨率场景)
+const MAX_MONITOR_DIMENSION: i32 = 16384;
+/// 允许窗口略微超出屏幕边界仍视为有效位置
+const OFFSCREEN_MARGIN: i32 = 200;
+
 fn monitor_contains_position(x: i32, y: i32) -> bool {
-    let max_dim = 16384;
-    let margin = 200;
-    x >= -margin && x < max_dim && y >= -margin && y < max_dim
+    x >= -OFFSCREEN_MARGIN && x < MAX_MONITOR_DIMENSION && y >= -OFFSCREEN_MARGIN && y < MAX_MONITOR_DIMENSION
 }
 
 #[tauri::command]
