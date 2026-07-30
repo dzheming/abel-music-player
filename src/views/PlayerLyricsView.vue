@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import PlayerLayout from '../components/Player/PlayerLayout.vue'
+import PlayerLayout from '../components/Layout/PlayerLayout.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
-import CoverDisplay from '../components/Player/CoverDisplay.vue'
+import CoverDisplay from '../components/Display/CoverDisplay.vue'
 import { usePlayerStore } from '../stores/player'
 import { generateGradient } from '../utils/cover-gradient'
 import { stripExtension } from '../utils/format'

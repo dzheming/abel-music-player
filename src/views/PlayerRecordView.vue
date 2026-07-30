@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { usePlayerStore } from '../stores/player.ts'
-import PlayerLayout from '../components/Player/PlayerLayout.vue'
-import CoverDisplay from '../components/Player/CoverDisplay.vue'
-import ProgressBar from '../components/Player/ProgressBar.vue'
-import PlayControls from '../components/Player/PlayControls.vue'
+import PlayerLayout from '../components/Layout/PlayerLayout.vue'
+import CoverDisplay from '../components/Display/CoverDisplay.vue'
+import ProgressBar from '../components/Controls/ProgressBar.vue'
+import PlayControls from '../components/Controls/PlayControls.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
-import SpectrumVisualizer from '../components/Player/SpectrumVisualizer.vue'
+import SpectrumVisualizer from '../components/Display/SpectrumVisualizer.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
@@ -57,9 +57,9 @@ const playerStore = usePlayerStore()
 .vinyl-wrapper {
     align-self: end;
     justify-self: center;
-    width: min(80%, calc(100vh - 320px), calc(100vw - 400px));
+    width: min(100%, calc(100vh - 320px));
     max-width: 480px;
-    aspect-ratio: 1;
+    aspect-ratio: 1 / 1;
 }
 
 .left-controls {
@@ -179,7 +179,7 @@ const playerStore = usePlayerStore()
 
 .spectrum-display {
     height: 35%;
-    -webkit-box-reflect: below 0px linear-gradient(transparent 50%, rgba(255, 255, 255, 0.5));
+    -webkit-box-reflect: below 0px linear-gradient(transparent 20%, rgba(255, 255, 255, 0.5));
 }
 
 .split-right {

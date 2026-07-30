@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import PlayerLayout from '../components/Player/PlayerLayout.vue'
+import PlayerLayout from '../components/Layout/PlayerLayout.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
 
 const emit = defineEmits<{ close: [] }>()

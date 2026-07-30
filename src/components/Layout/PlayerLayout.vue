@@ -3,10 +3,10 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '../../stores/player'
 import { stripExtension } from '../../utils/format'
 import { generateGradient } from '../../utils/cover-gradient'
-import PlayControls from './PlayControls.vue'
-import ProgressBar from './ProgressBar.vue'
-import VolumeControl from './VolumeControl.vue'
-import EffectsPanel from './EffectsPanel.vue'
+import PlayControls from '../Controls/PlayControls.vue'
+import ProgressBar from '../Controls/ProgressBar.vue'
+import VolumeControl from '../Controls/VolumeControl.vue'
+import EffectsPanel from '../Effects/EffectsPanel.vue'
 
 const props = defineProps<{ hideFooter?: boolean; hideHeaderInfo?: boolean }>()
 const emit = defineEmits<{ close: [] }>()

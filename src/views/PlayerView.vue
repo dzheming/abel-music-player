@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import PlayerLayout from '../components/Player/PlayerLayout.vue'
-import CoverDisplay from '../components/Player/CoverDisplay.vue'
+import PlayerLayout from '../components/Layout/PlayerLayout.vue'
+import CoverDisplay from '../components/Display/CoverDisplay.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
-import SpectrumVisualizer from '../components/Player/SpectrumVisualizer.vue'
+import SpectrumVisualizer from '../components/Display/SpectrumVisualizer.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const coverRef = ref<HTMLElement | null>(null)
