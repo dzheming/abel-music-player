@@ -5,6 +5,7 @@ import CoverDisplay from '../components/Player/CoverDisplay.vue'
 import ProgressBar from '../components/Player/ProgressBar.vue'
 import PlayControls from '../components/Player/PlayControls.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
+import SpectrumVisualizer from '../components/Player/SpectrumVisualizer.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
@@ -24,6 +25,7 @@ const playerStore = usePlayerStore()
                         </div>
                     </div>
                     <div class="left-controls">
+                        <SpectrumVisualizer class="spectrum-display"/>
                         <ProgressBar hide-time />
                         <PlayControls />
                     </div>
@@ -47,20 +49,27 @@ const playerStore = usePlayerStore()
 }
 
 .split-left {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: clamp(48px, 1.5vw, 120px);
+    display: grid;
+    grid-template-rows: 7fr 3fr;
     min-height: 0;
+}
+
+.vinyl-wrapper {
+    align-self: end;
+    justify-self: center;
+    width: min(80%, calc(100vh - 320px), calc(100vw - 400px));
+    max-width: 480px;
+    aspect-ratio: 1;
 }
 
 .left-controls {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 36px;
+    justify-content: center;
+    gap: 24px;
     width: 100%;
+    padding-top: clamp(16px, 1vw, 32px);
 }
 
 .left-controls :deep(.play-controls) {
@@ -93,12 +102,6 @@ const playerStore = usePlayerStore()
     color: #fff;
 }
 
-.vinyl-wrapper {
-    width: min(80%, calc(100vh - 320px), calc(100vw - 400px));
-    max-width: 480px;
-    aspect-ratio: 1;
-}
-
 .vinyl-disc {
     position: relative;
     width: 100%;
@@ -106,23 +109,33 @@ const playerStore = usePlayerStore()
     border-radius: 50%;
     overflow: hidden;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    background: radial-gradient(
-        circle,
-        transparent 0%,
-        transparent 29%,
-        #1a1a1a 29.5%,
-        #111 35%,
-        #1a1a1a 40%,
-        #0d0d0d 45%,
-        #1a1a1a 50%,
-        #111 55%,
-        #1a1a1a 60%,
-        #0d0d0d 65%,
-        #1a1a1a 70%,
-        #111 80%,
-        #1a1a1a 90%,
-        #222 100%
+    background: repeating-radial-gradient(
+        circle at center,
+        #0d0d0d 0,
+        #0d0d0d 1.5px,
+        #1a1a1a 2px,
+        #0d0d0d 2.5px
     );
+}
+
+.vinyl-disc::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        rgba(255, 100, 100, 0.06) 10%,
+        transparent 20%,
+        rgba(100, 255, 100, 0.05) 35%,
+        transparent 45%,
+        rgba(100, 100, 255, 0.06) 60%,
+        transparent 70%,
+        rgba(255, 255, 100, 0.05) 85%,
+        transparent 100%
+    );
+    mix-blend-mode: overlay;
 }
 
 .vinyl-cover {
@@ -162,6 +175,11 @@ const playerStore = usePlayerStore()
 @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+.spectrum-display {
+    height: 35%;
+    -webkit-box-reflect: below 0px linear-gradient(transparent 50%, rgba(255, 255, 255, 0.5));
 }
 
 .split-right {
