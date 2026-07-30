@@ -295,10 +295,21 @@ export const useLibraryStore = defineStore('library', () => {
         await backgroundScanAll()
     }
 
+    async function rescanFolder(path: string) {
+        const files: string[] = await invoke('scan_music_folder', { path })
+        if (files.length === 0) return
+        const metadataList: RawTrack[] = await invoke('read_metadata_batch', { paths: files })
+        await invoke('cache_tracks', { tracks: metadataList })
+        if (selectedFolderPath.value?.startsWith(path)) {
+            await loadFromCache(selectedFolderPath.value)
+        }
+        useBrowseStore().refresh()
+    }
+
     return {
         folders, folderTrees, selectedFolderPath, selectedFolder, audioFiles, isScanning, scanProgress,
         globalSearchQuery, globalSearchResults, isGlobalSearching,
         addFolder, removeFolder, excludeFolder, restoreFolder, selectFolder,
-        globalSearch, clearGlobalSearch, refreshLibrary, initLibrary,
+        globalSearch, clearGlobalSearch, refreshLibrary, rescanFolder, initLibrary,
     }
 })

@@ -91,6 +91,11 @@ const menuItems = computed<MenuItem[]>(() => {
         },
     })
 
+    items.push({
+        label: '刷新数据',
+        action: () => libraryStore.rescanFolder(props.node.path),
+    })
+
     const isRootFolder = libraryStore.folders.some(f => f.path === props.node.path)
     if (isRootFolder) {
         items.push({
