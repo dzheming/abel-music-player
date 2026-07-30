@@ -1,23 +1,29 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { usePlayerStore } from './stores/player'
 import TitleBar from './components/Layout/TitleBar.vue'
 import Sidebar from './components/Layout/Sidebar.vue'
 import PlayerBar from './components/Layout/PlayerBar.vue'
 import PlayerView from './views/PlayerView.vue'
 import PlayerTimeView from './views/PlayerTimeView.vue'
 
-
+const playerStore = usePlayerStore()
 const showPlayerView = ref(false)
-const showTimeView = ref(false)
+
+const playerViewComponent = computed(() => {
+    switch (playerStore.playerViewStyle) {
+        case 'time': return PlayerTimeView
+        default: return PlayerView
+    }
+})
+
+function openPlayerView() {
+    showPlayerView.value = true
+}
 
 function closePlayerView() {
     showPlayerView.value = false
-    window.dispatchEvent(new Event('player-view-closed'))
-}
-
-function closeTimeView() {
-    showTimeView.value = false
     window.dispatchEvent(new Event('player-view-closed'))
 }
 
@@ -52,11 +58,10 @@ onUnmounted(() => {
         <main class="app-main">
             <router-view />
         </main>
-        <PlayerBar class="app-player-bar" @open-player="showPlayerView = true" @open-time-view="showTimeView = true"/>
+        <PlayerBar class="app-player-bar" @open-player="openPlayerView"/>
     </div>
 
-    <PlayerView v-if="showPlayerView" @close="closePlayerView" />
-    <PlayerTimeView v-if="showTimeView" @close="closeTimeView" />
+    <component :is="playerViewComponent" v-if="showPlayerView" @close="closePlayerView" />
 </template>
 
 <style scoped>

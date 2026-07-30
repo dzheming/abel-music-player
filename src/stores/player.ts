@@ -28,6 +28,7 @@ export const usePlayerStore = defineStore('player', () => {
     const volume = ref(0.8)
     const shuffle = ref(false)
     const loopMode = ref<LoopMode>(LoopMode.None)
+    const playerViewStyle = ref('default')
 
     invoke('get_setting', { key: 'volume' }).then(v => {
         if (v) volume.value = Number(v)
@@ -37,6 +38,9 @@ export const usePlayerStore = defineStore('player', () => {
     }).catch(() => {})
     invoke('get_setting', { key: 'loop-mode' }).then(v => {
         if (v && Object.values(LoopMode).includes(v as LoopMode)) loopMode.value = v as LoopMode
+    }).catch(() => {})
+    invoke('get_setting', { key: 'player-view-style' }).then(v => {
+        if (v) playerViewStyle.value = v as string
     }).catch(() => {})
 
     const isRestoringState = ref(true)
@@ -96,6 +100,9 @@ export const usePlayerStore = defineStore('player', () => {
     })
     watch(loopMode, (m) => {
         invoke('set_setting', { key: 'loop-mode', value: m }).catch(() => {})
+    })
+    watch(playerViewStyle, (v) => {
+        invoke('set_setting', { key: 'player-view-style', value: v }).catch(() => {})
     })
 
     function savePlayState() {
@@ -454,5 +461,6 @@ export const usePlayerStore = defineStore('player', () => {
         setPlaybackSpeed: effects.setPlaybackSpeed, setStereoBalance: effects.setStereoBalance,
         setReverbMix: effects.setReverbMix, setBassBoost: effects.setBassBoost,
         setVocalBoost: effects.setVocalBoost, resetEffects: effects.reset,
+        playerViewStyle,
     }
 })

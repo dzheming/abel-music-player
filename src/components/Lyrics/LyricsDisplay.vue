@@ -171,8 +171,9 @@ function scrollToLine(index: number) {
 .lyrics-display {
     height: 100%;
     overflow-y: auto;
-    padding: 0 24px;
     scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transition 100%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 90%, transition 100%);
 }
 
 .lyrics-display::-webkit-scrollbar {

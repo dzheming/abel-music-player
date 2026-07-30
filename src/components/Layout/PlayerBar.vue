@@ -8,7 +8,7 @@ import PlayControls from '../Player/PlayControls.vue'
 import VolumeControl from '../Player/VolumeControl.vue'
 import EffectsPanel from '../Player/EffectsPanel.vue'
 
-const emit = defineEmits<{ openPlayer: [], openTimeView: [] }>()
+const emit = defineEmits<{ openPlayer: [] }>()
 const playerStore = usePlayerStore()
 const showEq = ref(false)
 const eqBtnRef = ref<HTMLElement | null>(null)
@@ -20,8 +20,8 @@ function toggleEqPanel() {
 
 function onClickOutside(e: MouseEvent) {
     if (
-        showEq.value && 
-        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) && 
+        showEq.value &&
+        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) &&
         eqBtnRef.value && !eqBtnRef.value.contains(e.target as Node)
     ) {
         showEq.value = false
@@ -81,7 +81,7 @@ const coverGradient = computed(() => {
                         <EffectsPanel />
                     </div>
                 </div>
-                <button class="expand-btn" @click="emit('openTimeView')" title="展开播放页">
+                <button class="expand-btn" @click="emit('openPlayer')" title="展开播放页">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
                         <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
