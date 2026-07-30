@@ -8,7 +8,8 @@ import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
 import { adjustBrightness } from '../utils/color'
 import { extractDominantColor } from '../utils/extract-color'
-import type { AudioFile, CachedTrackData } from '../types'
+import { toTrack } from '../types'
+import type { Track, RawTrack } from '../types'
 
 interface SavedPlayState {
     paths: string[]
@@ -19,7 +20,7 @@ interface SavedPlayState {
 export const usePlayerStore = defineStore('player', () => {
     const audio = new Audio()
     audio.crossOrigin = 'anonymous'
-    const playlist = ref<AudioFile[]>([])
+    const playlist = ref<Track[]>([])
     const currentIndex = ref(-1)
     const isPlaying = ref(false)
     const currentTime = ref(0)
@@ -43,11 +44,11 @@ export const usePlayerStore = defineStore('player', () => {
     const eq = useEqualizer()
     const effects = useAudioEffects()
 
-    const currentTrack = computed(() => 
+    const currentTrack = computed(() =>
         currentIndex.value >= 0 ? playlist.value[currentIndex.value] : null
     )
 
-    const progress = computed(() => 
+    const progress = computed(() =>
         duration.value > 0 ? currentTime.value / duration.value : 0
     )
 
@@ -64,16 +65,16 @@ export const usePlayerStore = defineStore('player', () => {
         handleTrackEnd()
     })
     let saveTimer: ReturnType<typeof setInterval> | null = null
-    audio.addEventListener('play', () => { 
-        isPlaying.value = true 
+    audio.addEventListener('play', () => {
+        isPlaying.value = true
         if (useSettingsStore().preventSleep) {
             invoke('prevent_sleep').catch(() => {})
         }
         if (saveTimer) clearInterval(saveTimer)
         saveTimer = setInterval(savePlayState, 5000)
     })
-    audio.addEventListener('pause', () => { 
-        isPlaying.value = false 
+    audio.addEventListener('pause', () => {
+        isPlaying.value = false
         if (useSettingsStore().preventSleep) {
             invoke('allow_sleep').catch(() => {})
         }
@@ -112,19 +113,12 @@ export const usePlayerStore = defineStore('player', () => {
             if (!raw) return
             const state: SavedPlayState = JSON.parse(raw as string)
             if (state.paths.length > 0 && state.currentIndex >= 0 && state.currentIndex < state.paths.length) {
-                const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: state.paths })
+                const cached: RawTrack[] = await invoke('get_cached_tracks_for_paths', { paths: state.paths })
                 const cachedMap = new Map(cached.map(c => [c.path, c]))
-                const restored: AudioFile[] = state.paths.map(path => {
+                const restored: Track[] = state.paths.map(path => {
                     const c = cachedMap.get(path)
-                    return {
-                        path,
-                        fileName: c?.file_name || path.split(/[/\\]/).pop() || path,
-                        title: c?.title || undefined,
-                        artist: c?.artist || undefined,
-                        album: c?.album || undefined,
-                        duration: c?.duration || 0,
-                        trackNumber: c?.track_number || undefined,
-                    }
+                    if (c) return toTrack(c)
+                    return { path, fileName: path.split(/[/\\]/).pop() || path }
                 })
                 playlist.value = restored
                 currentIndex.value = state.currentIndex
@@ -147,7 +141,7 @@ export const usePlayerStore = defineStore('player', () => {
         }
     }
 
-    function setPlaylist(files: AudioFile[], startIndex = 0) {
+    function setPlaylist(files: Track[], startIndex = 0) {
         playlist.value = files
         playTrackAt(startIndex)
     }
@@ -173,7 +167,7 @@ export const usePlayerStore = defineStore('player', () => {
                 fadeGainNode.gain.setValueAtTime(0, audioContext.currentTime)
                 fadeGainNode.gain.linearRampToValueAtTime(1, audioContext.currentTime + FADE_IN_DURATION)
             }
-    
+
             if (track.coverUrl) {
                 updateTaskbarIcon(track.coverUrl)
                 updateMediaSession(track)
@@ -201,7 +195,7 @@ export const usePlayerStore = defineStore('player', () => {
         }
     }
 
-    function updateMediaSession(track: AudioFile) {
+    function updateMediaSession(track: Track) {
         if ('mediaSession' in navigator) {
             const artwork = track.coverUrl ? [{ src: track.coverUrl }] : []
             navigator.mediaSession.metadata = new MediaMetadata({
@@ -441,7 +435,7 @@ export const usePlayerStore = defineStore('player', () => {
         eq.resetEq()
     }
 
-    function appendTracks(files: AudioFile[]) {
+    function appendTracks(files: Track[]) {
         const existing = new Set(playlist.value.map(f => f.path))
         const newFiles = files.filter(f => !existing.has(f.path))
         if (newFiles.length > 0) {

@@ -12,7 +12,7 @@ import VirtualList from '../components/VirtualList.vue'
 import PlaylistContent from './PlaylistContent.vue'
 import BrowseContent from './BrowseContent.vue'
 import { useTrackContextMenu } from '../composables/useTrackContextMenu'
-import type { AudioFile } from '../types'
+import type { Track } from '../types'
 
 const libraryStore = useLibraryStore()
 const playlistStore = usePlaylistStore()
@@ -78,7 +78,7 @@ const groupedFiles = computed<GroupedFiles[]>(() => {
     return groups
 })
 
-type FlatItem = { type: 'dir'; dir: string; count: number } | { type: 'track'; file: AudioFile; globalIndex: number }
+type FlatItem = { type: 'dir'; dir: string; count: number } | { type: 'track'; file: Track; globalIndex: number }
 
 const flatItems = computed<FlatItem[]>(() => {
     const result: FlatItem[] = []
@@ -101,7 +101,7 @@ const folderName = computed(() => {
     return p.replace(/[/\\]$/, '').split(/[/\\]/).pop() || '乐库'
 })
 
-function onTrackDblClick(file: AudioFile) {
+function onTrackDblClick(file: Track) {
     playlistStore.addToDefault([file.path])
     playerStore.appendTracks([file])
     const trackIndex = playerStore.playlist.findIndex(f => f.path === file.path)

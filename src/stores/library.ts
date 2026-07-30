@@ -3,34 +3,45 @@ import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
-import type { AudioFile, MusicFolder, FolderNode, RawMetadata, CachedTrackData } from '../types'
+import { useBrowseStore } from './browse'
+import { usePlaylistStore } from './playlist'
+import { usePlayerStore } from './player'
+import { toTrack } from '../types'
+import type { Track, RawTrack, LibraryFolder, LibraryFolderNode } from '../types'
 
 export const useLibraryStore = defineStore('library', () => {
-    const folders = ref<MusicFolder[]>([])
-    const folderTrees = ref<Map<string, FolderNode>>(new Map())
+    const folders = ref<LibraryFolder[]>([])
+    const folderTrees = ref<Map<string, LibraryFolderNode>>(new Map())
     const selectedFolderPath = ref<string | null>(null)
+    const audioFiles = ref<Track[]>([])
+    const isScanning = ref(false)
+    const scanProgress = ref('')
+    const globalSearchQuery = ref('')
+    const globalSearchResults = ref<Track[]>([])
+    const isGlobalSearching = ref(false)
+    let scanGeneration = 0
+
+    const selectedFolder = computed(() =>
+        folders.value.find(f => f.path === selectedFolderPath.value) || null
+    )
+
     async function initLibrary() {
         try {
-            const foldersRaw = await invoke('get_setting', { key: 'music-folders' })
-            if (foldersRaw) {
-                try { 
-                    folders.value = JSON.parse(foldersRaw as string) 
-                } catch (e) {
-                    console.error('Failed to parse music folders:', e)
-                }
-            }
-            for (const folder of folders.value) {
-                loadFolderTree(folder.path)
-            }
+            folders.value = await invoke('get_library_folders')
             const selectedRaw = await invoke('get_setting', { key: 'selected-folder' })
             if (selectedRaw) {
                 selectedFolderPath.value = selectedRaw as string
+            }
+            for (const folder of folders.value) {
+                await syncAndLoadTree(folder.path)
+            }
+            if (selectedRaw) {
                 await loadFromCache(selectedRaw as string)
             }
         } catch (e) {
             console.error('Failed to init library:', e)
         }
-        
+
         try {
             await invoke('cleanup_stale_cache')
             await backgroundScanAll()
@@ -38,52 +49,101 @@ export const useLibraryStore = defineStore('library', () => {
             console.error('Background scan failed:', e)
         }
     }
-    const audioFiles = ref<AudioFile[]>([])
-    const isScanning = ref(false)
-    const scanProgress = ref('')
-    const globalSearchQuery = ref('')
-    const globalSearchResults = ref<AudioFile[]>([])
-    const isGlobalSearching = ref(false)
-    let scanGeneration = 0
 
-    const selectedFolder = computed(() => 
-        folders.value.find(f => f.path === selectedFolderPath.value) || null
-    )
+    async function syncAndLoadTree(rootPath: string) {
+        try {
+            await invoke('sync_library_folder', { rootPath })
+            const tree: LibraryFolderNode = await invoke('get_folder_tree', { rootPath })
+            folderTrees.value.set(rootPath, tree)
+        } catch (e) {
+            console.error('Failed to sync/load folder tree:', e)
+        }
+    }
 
     async function addFolder() {
         const selected = await open({ directory: true, multiple: false })
         if (!selected) return
 
         const path = selected as string
-        if (folders.value.some(f => f.path === path)) return
+        const rootPath: string = await invoke('add_library_folder', { path })
 
-        const name = path.split(/[/\\]/).pop() || path
-        folders.value.push({ path, name })
-        invoke('set_setting', { key: 'music-folders', value: JSON.stringify(folders.value) }).catch(() => {})
-
-        await loadFolderTree(path)
+        folders.value = await invoke('get_library_folders')
+        await syncAndLoadTree(rootPath)
         await scanAndSelect(path)
+        useBrowseStore().refresh()
     }
 
-    function removeFolder(path: string) {
-        folders.value = folders.value.filter(f => f.path !== path)
+    async function removeFolder(path: string) {
+        await invoke('remove_library_folder', { path })
+        const playerStore = usePlayerStore()
+        if (playerStore.currentTrack?.path.startsWith(path)) {
+            playerStore.stop()
+            playerStore.setPlaylist([], 0)
+        }
+        const playlistStore = usePlaylistStore()
+        await playlistStore.loadPlaylists()
+        if (playlistStore.currentPlaylistId) {
+            await playlistStore.selectPlaylist(playlistStore.currentPlaylistId)
+        }
+
+        folders.value = await invoke('get_library_folders')
         folderTrees.value.delete(path)
-        invoke('set_setting', { key: 'music-folders', value: JSON.stringify(folders.value) }).catch(() => {})
-        invoke('remove_tracks_by_folder', { folderPath: path }).catch(() => {})
         if (selectedFolderPath.value?.startsWith(path)) {
-            selectedFolderPath.value = null
-            invoke('set_setting', { key: 'selected-folder', value: '' }).catch(() => {})
-            audioFiles.value = []
+            if (folders.value.length > 0) {
+                await selectFolder(folders.value[0].path)
+            } else {
+                selectedFolderPath.value = null
+                invoke('set_setting', { key: 'selected-folder', value: '' }).catch(() => {})
+                audioFiles.value = []
+            }
         }
+        useBrowseStore().refresh()
     }
 
-    async function loadFolderTree(path: string) {
-        try {
-            const tree: FolderNode = await invoke('scan_folder_tree', { path })
-            folderTrees.value.set(path, tree)
-        } catch (e) {
-            console.error('Failed to load folder tree:', e)
+    async function excludeFolder(path: string) {
+        await invoke('exclude_folder', { path })
+        const playerStore = usePlayerStore()
+        if (playerStore.currentTrack?.path.startsWith(path)) {
+            playerStore.stop()
+            playerStore.setPlaylist([], 0)
         }
+        const playlistStore = usePlaylistStore()
+        await playlistStore.loadPlaylists()
+        if (playlistStore.currentPlaylistId) {
+            await playlistStore.selectPlaylist(playlistStore.currentPlaylistId)
+        }
+
+        // Reload folder trees
+        const rootFolder = folders.value.find(f => path.startsWith(f.path))
+        if (rootFolder) {
+            const tree: LibraryFolderNode = await invoke('get_folder_tree', { rootPath: rootFolder.path })
+            folderTrees.value.set(rootFolder.path, tree)
+        }
+
+        if (selectedFolderPath.value?.startsWith(path)) {
+            if (rootFolder) {
+                await selectFolder(rootFolder.path)
+            } else if (folders.value.length > 0) {
+                await selectFolder(folders.value[0].path)
+            } else {
+                selectedFolderPath.value = null
+                invoke('set_setting', { key: 'selected-folder', value: '' }).catch(() => {})
+                audioFiles.value = []
+            }
+        }
+        useBrowseStore().refresh()
+    }
+
+    async function restoreFolder(path: string) {
+        await invoke('restore_folder', { path })
+        const rootFolder = folders.value.find(f => path.startsWith(f.path))
+        if (rootFolder) {
+            await syncAndLoadTree(rootFolder.path)
+        }
+        if (selectedFolderPath.value) {
+            await loadFromCache(selectedFolderPath.value)
+        }
+        useBrowseStore().refresh()
     }
 
     async function selectFolder(path: string) {
@@ -101,17 +161,9 @@ export const useLibraryStore = defineStore('library', () => {
         try {
             const files: string[] = await invoke('scan_music_folder', { path })
             if (myGen !== scanGeneration) return
-            const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
-            if (myGen !== scanGeneration) return 
-            audioFiles.value = cached.map(c => ({
-                path: c.path,
-                fileName: c.file_name,
-                title: c.title || undefined,
-                artist: c.artist || undefined,
-                album: c.album || undefined,
-                duration: c.duration,
-                trackNumber: c.track_number || undefined,
-            }))
+            const cached: RawTrack[] = await invoke('get_cached_tracks_for_paths', { paths: files })
+            if (myGen !== scanGeneration) return
+            audioFiles.value = cached.map(toTrack)
         } catch (e) {
             audioFiles.value = []
         } finally {
@@ -126,22 +178,13 @@ export const useLibraryStore = defineStore('library', () => {
         for (const folder of folders.value) {
             try {
                 const files: string[] = await invoke('scan_music_folder', { path: folder.path })
-                const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: files })
+                const cached: RawTrack[] = await invoke('get_cached_tracks_for_paths', { paths: files })
                 const cachedPaths = new Set(cached.map(c => c.path))
                 const uncachedPaths = files.filter(f => !cachedPaths.has(f))
 
                 if (uncachedPaths.length > 0) {
-                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
-                    const cacheData = metadataList.map(m => ({
-                        path: m.path,
-                        file_name: m.file_name,
-                        title: m.title,
-                        artist: m.artist,
-                        album: m.album,
-                        duration: m.duration,
-                        track_number: m.track_number,
-                    }))
-                    await invoke('cache_tracks', { tracks: cacheData })
+                    const metadataList: RawTrack[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
+                    await invoke('cache_tracks', { tracks: metadataList })
                     if (selectedFolderPath.value?.startsWith(folder.path)) {
                         await loadFromCache(selectedFolderPath.value)
                     }
@@ -170,21 +213,12 @@ export const useLibraryStore = defineStore('library', () => {
             for (let i = 0; i < files.length; i += BATCH) {
                 if (myGen !== scanGeneration) return
                 const batch = files.slice(i, i + BATCH)
-                const cached: CachedTrackData[] = await invoke('get_cached_tracks_for_paths', { paths: batch })
+                const cached: RawTrack[] = await invoke('get_cached_tracks_for_paths', { paths: batch })
                 if (myGen !== scanGeneration) return
                 const cachedPaths = new Set(cached.map(c => c.path))
-    
+
                 if (cached.length > 0) {
-                    const tracks = cached.map(c => ({
-                        path: c.path,
-                        fileName: c.file_name,
-                        title: c.title || undefined,
-                        artist: c.artist || undefined,
-                        album: c.album || undefined,
-                        duration: c.duration,
-                        trackNumber: c.track_number || undefined,
-                    }))
-                    audioFiles.value.push(...tracks)
+                    audioFiles.value.push(...cached.map(toTrack))
                 }
 
                 for (const p of batch) {
@@ -193,54 +227,25 @@ export const useLibraryStore = defineStore('library', () => {
                 scanProgress.value = `已加载 ${audioFiles.value.length} / ${files.length} 首...`
             }
 
-
             if (uncachedPaths.length > 0) {
                 scanProgress.value = `正在读取 ${uncachedPaths.length} 首歌曲元数据...`
 
-                const unlistenMeta = await listen<RawMetadata[]>('metadata-batch-chunk', (event) => {
+                const unlistenMeta = await listen<RawTrack[]>('metadata-batch-chunk', (event) => {
                     if (myGen !== scanGeneration) return
-                    const chunk = event.payload.map(m => ({
-                        path: m.path,
-                        fileName: m.file_name,
-                        title: m.title || undefined,
-                        artist: m.artist || undefined,
-                        album: m.album || undefined,
-                        duration: m.duration,
-                        trackNumber: m.track_number || undefined,
-                    }))
-                    audioFiles.value = [...audioFiles.value, ...chunk]
+                    audioFiles.value = [...audioFiles.value, ...event.payload.map(toTrack)]
                     scanProgress.value = `已加载 ${audioFiles.value.length} / ${files.length} 首...`
                 })
                 try {
-                    const metadataList: RawMetadata[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
+                    const metadataList: RawTrack[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
                     if (myGen !== scanGeneration) return
 
                     const allPaths = new Set(audioFiles.value.map(f => f.path))
                     const missing = metadataList.filter(m => !allPaths.has(m.path))
                     if (missing.length > 0) {
-                        const missingFiles = missing.map(m => ({
-                            path: m.path,
-                            fileName: m.file_name,
-                            title: m.title || undefined,
-                            artist: m.artist || undefined,
-                            album: m.album || undefined,
-                            duration: m.duration,
-                            coverUrl: m.cover || undefined,
-                            trackNumber: m.track_number || undefined,
-                        }))
-                        audioFiles.value = [...audioFiles.value, ...missingFiles]
+                        audioFiles.value = [...audioFiles.value, ...missing.map(toTrack)]
                     }
 
-                    const cacheData = metadataList.map(m => ({
-                        path: m.path,
-                        file_name: m.file_name,
-                        title: m.title,
-                        artist: m.artist,
-                        album: m.album,
-                        duration: m.duration,
-                        track_number: m.track_number,
-                    }))
-                    invoke('cache_tracks', { tracks: cacheData }).catch(() => {})
+                    await invoke('cache_tracks', { tracks: metadataList })
                 } finally {
                     unlistenMeta()
                 }
@@ -264,16 +269,8 @@ export const useLibraryStore = defineStore('library', () => {
         }
         isGlobalSearching.value = true
         try {
-            const results: { path: string; file_name: string; title: string | null; artist: string | null; album: string | null; duration: number }[] =
-                await invoke('search_tracks', { query: query.trim() })
-            globalSearchResults.value = results.map(r => ({
-                path: r.path,
-                fileName: r.file_name,
-                title: r.title || undefined,
-                artist: r.artist || undefined,
-                album: r.album || undefined,
-                duration: r.duration,
-            }))
+            const results: RawTrack[] = await invoke('search_tracks', { query: query.trim() })
+            globalSearchResults.value = results.map(toTrack)
         } catch (e) {
             console.error('Global search failed:', e)
             globalSearchResults.value = []
@@ -288,6 +285,9 @@ export const useLibraryStore = defineStore('library', () => {
     }
 
     async function refreshLibrary() {
+        for (const folder of folders.value) {
+            await syncAndLoadTree(folder.path)
+        }
         await invoke('clear_track_cache')
         if (selectedFolderPath.value) {
             await scanAndSelect(selectedFolderPath.value)
@@ -298,7 +298,7 @@ export const useLibraryStore = defineStore('library', () => {
     return {
         folders, folderTrees, selectedFolderPath, selectedFolder, audioFiles, isScanning, scanProgress,
         globalSearchQuery, globalSearchResults, isGlobalSearching,
-        addFolder, removeFolder, loadFolderTree, selectFolder, globalSearch, clearGlobalSearch, refreshLibrary,
-        initLibrary,
+        addFolder, removeFolder, excludeFolder, restoreFolder, selectFolder,
+        globalSearch, clearGlobalSearch, refreshLibrary, initLibrary,
     }
 })

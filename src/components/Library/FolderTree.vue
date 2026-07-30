@@ -6,10 +6,10 @@ import { useLibraryStore } from '../../stores/library'
 import { usePlaylistStore } from '../../stores/playlist'
 import ContextMenu from '../ContextMenu.vue'
 import type { MenuItem } from '../ContextMenu.vue'
-import type { FolderNode } from '../../types'
+import type { LibraryFolderNode } from '../../types'
 
 const props = defineProps<{
-    node: FolderNode
+    node: LibraryFolderNode
     depth?: number
 }>()
 
@@ -22,11 +22,14 @@ const showMenu = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 
+function normalizePath(p: string) { return p.replace(/\\/g, '/') }
+
 function shouldAutoExpand(): boolean {
     const selected = libraryStore.selectedFolderPath
     if (!selected) return false
-    if (selected === props.node.path) return false
-    return selected.startsWith(props.node.path + '\\') || selected.startsWith(props.node.path + '/')
+    const ns = normalizePath(selected)
+    const np = normalizePath(props.node.path)
+    return ns === np || ns.startsWith(np + '/')
 }
 
 const expanded = ref(shouldAutoExpand())
@@ -93,6 +96,12 @@ const menuItems = computed<MenuItem[]>(() => {
         items.push({
             label: '从乐库移除',
             action: () => libraryStore.removeFolder(props.node.path),
+            danger: true,
+        })
+    } else {
+        items.push({
+            label: '排除此目录',
+            action: () => libraryStore.excludeFolder(props.node.path),
             danger: true,
         })
     }

@@ -24,8 +24,8 @@ function toggleEqPanel() {
 
 function onEqClickOutside(e: MouseEvent) {
     if (
-        showEq.value && 
-        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) && 
+        showEq.value &&
+        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) &&
         eqBtnRef.value && !eqBtnRef.value.contains(e.target as Node)
     ) {
         showEq.value = false
@@ -117,7 +117,7 @@ const coverGradient = computed(() => {
                     <ProgressBar />
                     <VolumeControl />
                     <div class="eq-wrapper">
-                        <button 
+                        <button
                             ref="eqBtnRef"
                             class="eq-btn"
                             :class="{ active: playerStore.eqEnabled }"
@@ -285,7 +285,7 @@ const coverGradient = computed(() => {
 }
 
 .cover-large {
-    width: min(80%, calc(100vh - 320px));
+    width: min(80%, calc(100vh - 320px), calc(100vw - 400px));
     min-width: 240px;
     aspect-ratio: 1;
     border-radius: var(--radius-lg);

@@ -1,29 +1,41 @@
 use std::path::Path;
-use serde::Serialize;
 use walkdir::WalkDir;
 
-const AUDIO_EXTENSIONS: &[&str] = &["mp3", "flac", "wav", "ogg", "aac", "m4a", "wma"];
+use super::database::DbState;
+use super::library::{get_excluded_folders_from_db, normalize_path};
+use super::AUDIO_EXTENSIONS;
 
-#[derive(Serialize, Clone)]
-pub struct FolderNode {
-    pub name: String,
-    pub path: String,
-    pub children: Vec<FolderNode>,
-    pub audio_count: usize,
+fn is_excluded(path: &str, excluded: &[String]) -> bool {
+    let norm = normalize_path(path);
+    excluded.iter().any(|ex| {
+        norm == *ex || norm.starts_with(&format!("{}/", ex))
+    })
 }
 
 #[tauri::command]
-pub fn scan_music_folder(path: String) -> Result<Vec<String>, String> {
+pub fn scan_music_folder(path: String, state: tauri::State<'_, DbState>) -> Result<Vec<String>, String> {
     let dir = Path::new(&path);
     if !dir.exists() || !dir.is_dir() {
         return Err(format!("Path does not exist or is not a directory: {}", path));
     }
+
+    let excluded = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        get_excluded_folders_from_db(&conn)
+    };
 
     let mut audio_files: Vec<String> = Vec::new();
 
     for entry in WalkDir::new(dir)
         .follow_links(true)
         .into_iter()
+        .filter_entry(|e| {
+            if e.file_type().is_dir() {
+                !is_excluded(&e.path().to_string_lossy(), &excluded)
+            } else {
+                true
+            }
+        })
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
@@ -31,87 +43,7 @@ pub fn scan_music_folder(path: String) -> Result<Vec<String>, String> {
             if let Some(ext) = path.extension() {
                 let ext_lower = ext.to_string_lossy().to_lowercase();
                 if AUDIO_EXTENSIONS.contains(&ext_lower.as_str()) {
-                    if let Some(path_str) = path.to_str() {
-                        audio_files.push(path_str.to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    audio_files.sort();
-    Ok(audio_files)
-}
-
-#[tauri::command]
-pub fn scan_folder_tree(path: String) -> Result<FolderNode, String> {
-    let dir = Path::new(&path);
-    if !dir.exists() || !dir.is_dir() {
-        return Err(format!("Path does not exist or is not a directory: {}", path));
-    }
-
-    Ok(build_folder_node(dir))
-}
-
-fn build_folder_node(dir: &Path) -> FolderNode {
-    let name = dir
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| dir.to_string_lossy().to_string());
-
-    let mut children: Vec<FolderNode> = Vec::new();
-    let mut audio_count: usize = 0;
-
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let entry_path = entry.path();
-            if entry_path.is_dir() {
-                let child = build_folder_node(&entry_path);
-                if child.audio_count > 0 || !child.children.is_empty() {
-                    audio_count += child.audio_count;
-                    children.push(child);
-                }
-            } else if entry_path.is_file() {
-                if let Some(ext) = entry_path.extension() {
-                    let ext_lower = ext.to_string_lossy().to_lowercase();
-                    if AUDIO_EXTENSIONS.contains(&ext_lower.as_str()) {
-                        audio_count += 1;
-                    }
-                }
-            }
-        }
-    }
-
-    children.sort_by(|a, b| a.name.cmp(&b.name));
-
-    FolderNode {
-        name,
-        path: dir.to_string_lossy().to_string(),
-        children,
-        audio_count,
-    }
-}
-
-#[tauri::command]
-pub fn scan_folder_files(path: String) -> Result<Vec<String>, String> {
-    let dir = Path::new(&path);
-    if !dir.exists() || !dir.is_dir() {
-        return Err(format!("Path does not exist or is not a directory: {}", path));
-    }
-
-    let mut audio_files: Vec<String> = Vec::new();
-
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.filter_map(|e| e.ok()) {
-            let entry_path = entry.path();
-            if entry_path.is_file() {
-                if let Some(ext) = entry_path.extension() {
-                    let ext_lower = ext.to_string_lossy().to_lowercase();
-                    if AUDIO_EXTENSIONS.contains(&ext_lower.as_str()) {
-                        if let Some(path_str) = entry_path.to_str() {
-                            audio_files.push(path_str.to_string());
-                        }
-                    }
+                    audio_files.push(normalize_path(&path.to_string_lossy()));
                 }
             }
         }

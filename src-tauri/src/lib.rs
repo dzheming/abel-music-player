@@ -1,17 +1,24 @@
 mod commands;
 
-use commands::database::{
-    init_db, DbState,
-    create_playlist, delete_playlist, rename_playlist, get_playlists,
-    add_to_playlist, remove_from_playlist, clear_playlist, remove_tracks_by_folder, get_playlist_tracks,
+use commands::cache::{
     cache_tracks, get_cached_tracks_for_paths, clear_track_cache, cleanup_stale_cache,
     get_artists, get_albums, get_tracks_by_artist, get_tracks_by_album,
-    search_tracks, get_setting, set_setting, get_random_tracks,
+    search_tracks, get_random_tracks,
 };
+use commands::database::{init_db, DbState};
+use commands::library::{
+    get_library_folders, get_folder_tree, add_library_folder, remove_library_folder,
+    exclude_folder, restore_folder, sync_library_folder,
+};
+use commands::playlist::{
+    create_playlist, delete_playlist, rename_playlist, get_playlists,
+    add_to_playlist, remove_from_playlist, clear_playlist, get_playlist_tracks,
+};
+use commands::settings::{get_setting, set_setting};
 use commands::lyrics::{download_lyrics, fetch_netease_lyric, read_local_lyrics, search_netease_lyrics};
 use commands::metadata::{read_cover, read_metadata, read_metadata_batch};
 use commands::portable::get_portable_dir;
-use commands::scanner::{scan_folder_files, scan_folder_tree, scan_music_folder};
+use commands::scanner::scan_music_folder;
 use commands::theme::get_system_accent_color;
 use commands::window::{allow_sleep, prevent_sleep, reset_taskbar_icon, restore_window_state, save_window_state, set_taskbar_icon};
 
@@ -30,8 +37,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             scan_music_folder,
-            scan_folder_tree,
-            scan_folder_files,
             get_system_accent_color,
             read_metadata,
             read_metadata_batch,
@@ -51,7 +56,6 @@ pub fn run() {
             add_to_playlist,
             remove_from_playlist,
             clear_playlist,
-            remove_tracks_by_folder,
             get_playlist_tracks,
             cache_tracks,
             get_cached_tracks_for_paths,
@@ -65,6 +69,13 @@ pub fn run() {
             get_setting,
             set_setting,
             get_random_tracks,
+            get_library_folders,
+            get_folder_tree,
+            add_library_folder,
+            remove_library_folder,
+            exclude_folder,
+            restore_folder,
+            sync_library_folder,
             prevent_sleep,
             allow_sleep
         ])

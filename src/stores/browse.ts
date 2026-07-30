@@ -1,14 +1,15 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { ArtistGroup, AlbumGroup, AudioFile, RawMetadata } from '../types'
+import { toTrack } from '../types'
+import type { ArtistGroup, AlbumGroup, Track, RawTrack } from '../types'
 
 export const useBrowseStore = defineStore('browse', () => {
     const artists = ref<ArtistGroup[]>([])
     const albums = ref<AlbumGroup[]>([])
     const currentArtist = ref<string | null>(null)
     const currentAlbum = ref<string | null>(null)
-    const tracks = ref<AudioFile[]>([])
+    const tracks = ref<Track[]>([])
     const isLoading = ref(false)
     const viewMode = ref<'artists' | 'albums'>('artists')
 
@@ -33,16 +34,8 @@ export const useBrowseStore = defineStore('browse', () => {
         currentAlbum.value = null
         isLoading.value = true
         try {
-            const raw: RawMetadata[] = await invoke('get_tracks_by_artist', { artist })
-            tracks.value = raw.map(t => ({
-                path: t.path,
-                fileName: t.file_name,
-                title: t.title || undefined,
-                artist: t.artist || undefined,
-                album: t.album || undefined,
-                duration: t.duration,
-                trackNumber: t.track_number || undefined,
-            }))
+            const raw: RawTrack[] = await invoke('get_tracks_by_artist', { artist })
+            tracks.value = raw.map(toTrack)
         } catch (e) {
             console.error('Failed to load artist tracks:', e)
             tracks.value = []
@@ -56,16 +49,8 @@ export const useBrowseStore = defineStore('browse', () => {
         currentArtist.value = null
         isLoading.value = true
         try {
-            const raw: RawMetadata[] = await invoke('get_tracks_by_album', { album })
-            tracks.value = raw.map(t => ({
-                path: t.path,
-                fileName: t.file_name,
-                title: t.title || undefined,
-                artist: t.artist || undefined,
-                album: t.album || undefined,
-                duration: t.duration,
-                trackNumber: t.track_number || undefined,
-            }))
+            const raw: RawTrack[] = await invoke('get_tracks_by_album', { album })
+            tracks.value = raw.map(toTrack)
         } catch (e) {
             console.error('Failed to load album tracks:', e)
             tracks.value = []
@@ -80,8 +65,13 @@ export const useBrowseStore = defineStore('browse', () => {
         tracks.value = []
     }
 
+    async function refresh() {
+        await loadArtists()
+        await loadAlbums()
+    }
+
     return {
         artists, albums, currentArtist, currentAlbum, tracks, isLoading, viewMode,
-        loadArtists, loadAlbums, selectArtist, selectAlbum, clearSelection,
+        loadArtists, loadAlbums, selectArtist, selectAlbum, clearSelection, refresh,
     }
 })

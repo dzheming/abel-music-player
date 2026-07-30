@@ -1,15 +1,4 @@
-export interface RawMetadata {
-    path: string
-    file_name: string
-    title: string | null
-    artist: string | null
-    album: string | null
-    duration: number
-    cover: string | null
-    track_number: number | null
-}
-
-export interface AudioFile {
+export interface Track {
     path: string
     fileName: string
     title?: string
@@ -20,16 +9,19 @@ export interface AudioFile {
     trackNumber?: number
 }
 
-export interface MusicFolder {
+export interface RawTrack {
     path: string
-    name: string
+    file_name: string
+    title: string | null
+    artist: string | null
+    album: string | null
+    duration: number
+    cover?: string | null
+    track_number: number | null
 }
 
-export interface FolderNode {
-    name: string
-    path: string
-    children: FolderNode[]
-    audio_count: number
+export interface RawPlaylistTrack extends RawTrack {
+    position: number
 }
 
 export enum LoopMode {
@@ -50,16 +42,6 @@ export interface PlayList {
     created_at: string
 }
 
-export interface PlayListTrack {
-    path: string
-    file_name: string
-    title?: string
-    artist?: string
-    album?: string
-    duration: number
-    position: number
-}
-
 export interface ArtistGroup {
     artist: string
     track_count: number
@@ -71,12 +53,32 @@ export interface AlbumGroup {
     track_count: number
 }
 
-export interface CachedTrackData {
+export interface LibraryFolder {
+    id: number
     path: string
-    file_name: string
-    title: string | null
-    artist: string | null
-    album: string | null
-    duration: number
-    track_number: number | null
+    name: string
+    parent_path: string | null
+    is_root: boolean
+    excluded: boolean
+    audio_count: number
+}
+
+export interface LibraryFolderNode {
+    path: string
+    name: string
+    audio_count: number
+    children: LibraryFolderNode[]
+}
+
+export function toTrack(raw: RawTrack): Track {
+    return {
+        path: raw.path,
+        fileName: raw.file_name,
+        title: raw.title || undefined,
+        artist: raw.artist || undefined,
+        album: raw.album || undefined,
+        duration: raw.duration,
+        coverUrl: raw.cover || undefined,
+        trackNumber: raw.track_number || undefined,
+    }
 }

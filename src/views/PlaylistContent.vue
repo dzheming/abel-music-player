@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, watch, nextTick, ref } from 'vue'
+import { computed, watch, nextTick, ref, onMounted } from 'vue'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
 import { invoke } from '@tauri-apps/api/core'
 import { formatTime, stripExtension } from '../utils/format'
+import { toTrack } from '../types'
 import ContextMenu from '../components/ContextMenu.vue'
 import type { MenuItem } from '../components/ContextMenu.vue'
 
@@ -15,22 +16,14 @@ const menuX = ref(0)
 const menuY = ref(0)
 const menuTrackPath = ref('')
 
-const selectedPlaylist = computed(() => 
+const selectedPlaylist = computed(() =>
     playlistStore.playlists.find(p => p.id === playlistStore.currentPlaylistId) || null
 )
 
 async function playPlaylist(index: number) {
     const tracks = playlistStore.currentTracks
     if (tracks.length === 0) return
-    const audioFiles = tracks.map(t => ({
-        path: t.path,
-        fileName: t.file_name,
-        title: t.title || undefined,
-        artist: t.artist || undefined,
-        album: t.album || undefined,
-        duration: t.duration,
-    }))
-    playerStore.setPlaylist(audioFiles, index)
+    playerStore.setPlaylist(tracks.map(toTrack), index)
     playlistStore.playingPlaylistId = playlistStore.currentPlaylistId
     invoke('set_setting', { key: 'playing-playlist-id', value: JSON.stringify(playlistStore.currentPlaylistId) }).catch(() => {})
 }
@@ -45,15 +38,19 @@ function onTrackContextMenu(e: MouseEvent, path: string) {
 
 const trackListRef = ref<HTMLElement | null>(null)
 
-watch(() => playerStore.currentTrack?.path, () => {
+function scrollToPlaying() {
     nextTick(() => {
         if (!trackListRef.value) return
         const playing = trackListRef.value.querySelector('.track-item.playing') as HTMLElement | null
         if (playing) {
-            playing.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            playing.scrollIntoView({ block: 'center' })
         }
     })
-})
+}
+
+watch(() => playerStore.currentTrack?.path, scrollToPlaying)
+watch(() => playlistStore.currentTracks, scrollToPlaying)
+onMounted(scrollToPlaying)
 
 const menuItems = computed<MenuItem[]>(() => {
     const path = menuTrackPath.value
@@ -104,7 +101,7 @@ const menuItems = computed<MenuItem[]>(() => {
                     @dblclick="playPlaylist(index)"
                     @contextmenu="onTrackContextMenu($event, track.path)"
                 >
-                    <span class="track-index">{{ track.position + 1 }}</span>
+                    <span class="track-index">{{ index + 1 }}</span>
                     <span class="track-title">{{ track.title || stripExtension(track.file_name) }}</span>
                     <span class="track-duration">{{ formatTime(track.duration) }}</span>
                 </div>

@@ -2,21 +2,10 @@ use base64::Engine;
 use lofty::prelude::*;
 use lofty::probe::Probe;
 use rayon::prelude::*;
-use serde::Serialize;
 use std::path::Path;
 use tauri::{AppHandle, Emitter};
 
-#[derive(Serialize, Clone)]
-pub struct TrackMetadata {
-    pub path: String,
-    pub file_name: String,
-    pub title: Option<String>,
-    pub artist: Option<String>,
-    pub album: Option<String>,
-    pub duration: f64,
-    pub cover: Option<String>,
-    pub track_number: Option<u32>,
-}
+use super::cache::TrackMetadata;
 
 fn mime_type_to_str(mime: Option<&lofty::picture::MimeType>) -> &'static str {
     match mime {
@@ -91,11 +80,9 @@ pub fn read_metadata(path: String) -> Result<TrackMetadata, String> {
 
 #[tauri::command]
 pub async fn read_metadata_batch(app: AppHandle, paths: Vec<String>) -> Vec<TrackMetadata> {
-    const CHUNK_SIZE: usize = 100;
-    
     let mut all_results: Vec<TrackMetadata> = Vec::with_capacity(paths.len());
 
-    for chunk in paths.chunks(CHUNK_SIZE) {
+    for chunk in paths.chunks(super::READ_METADATA_BATCH) {
         let chunk_owned: Vec<String> = chunk.to_vec();
         let results = match tokio::task::spawn_blocking(move || {
             chunk_owned.par_iter()

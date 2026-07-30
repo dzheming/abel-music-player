@@ -7,10 +7,10 @@ import { stripExtension } from '../../utils/format'
 import { generateGradient } from '../../utils/cover-gradient'
 import ContextMenu from '../ContextMenu.vue'
 import { useTrackContextMenu } from '../../composables/useTrackContextMenu'
-import type { AudioFile } from '../../types'
+import type { Track } from '../../types'
 
 const props = defineProps<{
-    file: AudioFile
+    file: Track
     mode?: 'library' | 'list'
 }>()
 

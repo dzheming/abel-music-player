@@ -4,6 +4,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
 import { useLibraryStore } from '../stores/library'
+import { toTrack } from '../types'
+import type { RawTrack } from '../types'
 import ContextMenu from '../components/ContextMenu.vue'
 import type { MenuItem } from '../components/ContextMenu.vue'
 
@@ -96,7 +98,7 @@ const playlistMenuItems = computed<MenuItem[]>(() => {
     if (!isDefault) {
         items.push({ label: '删除', action: () => handleDelete(id), danger: true })
     }
-    
+
     return items
 })
 
@@ -111,31 +113,21 @@ async function randomPlay() {
 
         await playlistStore.clearPlayList(defaultId)
 
-        const tracks: { path: string; file_name: string; title: string | null; artist: string | null; album: string | null; duration: number }[] = 
-            await invoke('get_random_tracks', { count: 100 })
+        const tracks: RawTrack[] = await invoke('get_random_tracks', { count: 100 })
         if (tracks.length === 0) return
 
         const paths = tracks.map(t => t.path)
         await playlistStore.addToPlaylist(defaultId, paths)
 
-        const audioFiles = tracks.map(t => ({
-            path: t.path,
-            fileName: t.file_name,
-            title: t.title || undefined,
-            artist: t.artist || undefined,
-            album: t.album || undefined,
-            duration: t.duration,
-        }))
-
         playerStore.shuffle = true
-        playerStore.setPlaylist(audioFiles, 0)
+        playerStore.setPlaylist(tracks.map(toTrack), 0)
 
         if (playlistStore.currentPlaylistId !== defaultId) {
             await playlistStore.selectPlaylist(defaultId)
         }
     } catch (e) {
         console.error('Random play failed:', e)
-    
+
     } finally {
         isRandomPlaying.value = false
     }
@@ -195,7 +187,7 @@ async function randomPlay() {
         <div v-if="playlistStore.playlists.length === 0" class="empty-hint">
             暂无播放列表
         </div>
-        
+
         <ContextMenu
             v-if="showMenu"
             :x="menuX"

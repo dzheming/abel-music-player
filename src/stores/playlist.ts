@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { PlayList, PlayListTrack } from '../types'
+import type { PlayList, RawPlaylistTrack } from '../types'
 
 export const usePlaylistStore = defineStore('playlist', () => {
     const DEFAULT_PLAYLIST_NAME = '默认列表'
@@ -10,10 +10,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
     const currentPlaylistId = ref<number | null>(null)
     const playingPlaylistId = ref<number | null>(null)
 
-    invoke('get_setting', { key: 'playing-playlist-id' }).then(v => {
-        if (v) playingPlaylistId.value = JSON.parse(v as string)
-    }).catch(() => {})
-    const currentTracks = ref<PlayListTrack[]>([])
+    const currentTracks = ref<RawPlaylistTrack[]>([])
     const isLoading = ref(false)
 
     async function loadPlaylists() {
@@ -146,6 +143,13 @@ export const usePlaylistStore = defineStore('playlist', () => {
     async function init() {
         await loadPlaylists()
         await ensureDefaultPlaylist()
+        try {
+            const v = await invoke('get_setting', { key: 'playing-playlist-id' })
+            if (v) playingPlaylistId.value = JSON.parse(v as string)
+        } catch {}
+        if (playingPlaylistId.value && playlists.value.some(p => p.id === playingPlaylistId.value)) {
+            await selectPlaylist(playingPlaylistId.value)
+        }
     }
 
     init()

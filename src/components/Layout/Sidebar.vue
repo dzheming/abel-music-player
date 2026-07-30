@@ -42,7 +42,7 @@ function clearSearch() {
             <button  class="sidebar-tab" :class="{ active: activeTab === 'browse' }" @click="switchTab('browse')">分类</button>
         </div>
 
-        <div v-if="activeTab === 'library'" class="sidebar-content">
+        <div v-show="activeTab === 'library'" class="sidebar-content">
             <div class="folder-trees">
                 <div v-for="folder in libraryStore.folders" :key="folder.path" class="library-section">
                     <FolderTree
@@ -72,11 +72,11 @@ function clearSearch() {
             </div>
         </div>
 
-        <div v-if="activeTab === 'playlist'" class="sidebar-content">
+        <div v-show="activeTab === 'playlist'" class="sidebar-content">
             <PlaylistView />
         </div>
 
-        <div v-if="activeTab === 'browse'" class="sidebar-content">
+        <div v-show="activeTab === 'browse'" class="sidebar-content">
             <BrowseView />
         </div>
     </aside>
