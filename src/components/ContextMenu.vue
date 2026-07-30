@@ -31,9 +31,9 @@ function handleMouseEnter(index: number, item: MenuItem) {
     if (item.children) {
         expandedIndex.value = index
         nextTick(() => {
-            const el = menuRef.value?.querySelector('.context-menu-item.has-children') as HTMLElement | null
+            const el = menuRef.value?.querySelector(`.context-menu-item[data-index="${index}"]`) as HTMLElement | null
             if (el) {
-                submenuLeft.value = (el.getBoundingClientRect().right + 140) > window.innerWidth
+                submenuLeft.value = (el.getBoundingClientRect().right + 160) > window.innerWidth
             }
         })
     } else {
@@ -48,7 +48,7 @@ function onClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => {
-    nextTick(() => document.addEventListener('mousedown', onClickOutside))
+    document.addEventListener('mousedown', onClickOutside)
 })
 
 onUnmounted(() => {
@@ -61,7 +61,8 @@ onUnmounted(() => {
         <div ref="menuRef" class="context-menu" :style="{ left: props.x + 'px', top: props.y + 'px' }">
             <div
                 v-for="(item, index) in props.items"
-                :key="index"
+                :key="item.label"
+                :data-index="index"
                 class="context-menu-item"
                 :class="{ danger: item.danger, 'has-children' : !!item.children }"
                 @click="handleClick(item)"
@@ -75,8 +76,8 @@ onUnmounted(() => {
                     :class="{ left: submenuLeft }"
                 >
                     <div
-                        v-for="(child, ci) in item.children"
-                        :key="ci"
+                        v-for="child in item.children"
+                        :key="child.label"
                         class="context-menu-item"
                         :class="{ danger: child.danger }"
                         @click.stop="() => { child.action(); emit('close') }"
@@ -89,7 +90,7 @@ onUnmounted(() => {
     </Teleport>
 </template>
 
-<style>
+<style scoped>
 .context-menu {
     position: fixed;
     z-index: 99999;
@@ -122,7 +123,7 @@ onUnmounted(() => {
     color: #e53935;
 }
 
-.context-menu-item.arrow {
+.context-menu-item .arrow {
     font-size: 10px;
     color: var(--color-text-tertiary);
 }

@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '../../stores/player'
-import { stripExtension } from '../../utils/format'
-import { generateGradient } from '../../utils/cover-gradient'
+import { useEqPanel } from '../../composables/useEqPanel'
+import { useTrackDisplay } from '../../composables/useTrackDisplay'
 import PlayControls from '../Controls/PlayControls.vue'
 import ProgressBar from '../Controls/ProgressBar.vue'
 import VolumeControl from '../Controls/VolumeControl.vue'
@@ -11,27 +10,8 @@ import EffectsPanel from '../Effects/EffectsPanel.vue'
 const props = defineProps<{ hideFooter?: boolean; hideHeaderInfo?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
-
-const showEq = ref(false)
-const eqBtnRef = ref<HTMLElement | null>(null)
-const eqPanelRef = ref<HTMLElement | null>(null)
-
-function toggleEqPanel() {
-    showEq.value = !showEq.value
-}
-
-function onEqClickOutside(e: MouseEvent) {
-    if (
-        showEq.value &&
-        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) &&
-        eqBtnRef.value && !eqBtnRef.value.contains(e.target as Node)
-    ) {
-        showEq.value = false
-    }
-}
-
-onMounted(() => document.addEventListener('mousedown', onEqClickOutside))
-onUnmounted(() => document.removeEventListener('mousedown', onEqClickOutside))
+const { showEq, eqBtnRef, eqPanelRef, toggleEqPanel } = useEqPanel()
+const { displayTitle, displayArtist, coverGradient } = useTrackDisplay()
 
 const VIEW_STYLES = ['default', 'time', 'lyrics', 'record']
 
@@ -39,22 +19,6 @@ function cycleViewStyle() {
     const idx = VIEW_STYLES.indexOf(playerStore.playerViewStyle)
     playerStore.playerViewStyle = VIEW_STYLES[(idx + 1) % VIEW_STYLES.length]
 }
-
-const displayTitle = computed(() => {
-    const track = playerStore.currentTrack
-    if (!track) return '未播放'
-    return track.title || stripExtension(track.fileName)
-})
-
-const displayArtist = computed(() => {
-    return playerStore.currentTrack?.artist || ''
-})
-
-const coverGradient = computed(() => {
-    if (!playerStore.currentTrack || playerStore.currentTrack.coverUrl) return {}
-    return { background: generateGradient(displayTitle.value, displayArtist.value) }
-})
-
 </script>
 
 <template>

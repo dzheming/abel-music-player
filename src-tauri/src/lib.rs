@@ -80,7 +80,9 @@ pub fn run() {
             allow_sleep
         ])
         .setup(|app| {
-            let conn = init_db();
+            let conn = init_db().map_err(|e| {
+                Box::<dyn std::error::Error>::from(e)
+            })?;
             app.manage(DbState(Mutex::new(conn)));
 
             let webview_data = get_portable_dir().join("webview");

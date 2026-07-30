@@ -74,11 +74,11 @@ export function toTrack(raw: RawTrack): Track {
     return {
         path: raw.path,
         fileName: raw.file_name,
-        title: raw.title || undefined,
-        artist: raw.artist || undefined,
-        album: raw.album || undefined,
+        title: raw.title ?? undefined,
+        artist: raw.artist ?? undefined,
+        album: raw.album ?? undefined,
         duration: raw.duration,
-        coverUrl: raw.cover || undefined,
-        trackNumber: raw.track_number || undefined,
+        coverUrl: raw.cover ?? undefined,
+        trackNumber: raw.track_number ?? undefined,
     }
 }

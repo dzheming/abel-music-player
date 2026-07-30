@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { PlayList, RawPlaylistTrack } from '../types'
+import type { PlayList, RawPlaylistTrack, Track } from '../types'
+import { toTrack } from '../types'
 
 export const usePlaylistStore = defineStore('playlist', () => {
     const DEFAULT_PLAYLIST_NAME = '默认列表'
@@ -10,7 +11,7 @@ export const usePlaylistStore = defineStore('playlist', () => {
     const currentPlaylistId = ref<number | null>(null)
     const playingPlaylistId = ref<number | null>(null)
 
-    const currentTracks = ref<RawPlaylistTrack[]>([])
+    const currentTracks = ref<Track[]>([])
     const isLoading = ref(false)
 
     async function loadPlaylists() {
@@ -62,7 +63,8 @@ export const usePlaylistStore = defineStore('playlist', () => {
         currentPlaylistId.value = id
         isLoading.value = true
         try {
-            currentTracks.value = await invoke('get_playlist_tracks', { playlistId: id })
+            const raw = await invoke<RawPlaylistTrack[]>('get_playlist_tracks', { playlistId: id })
+            currentTracks.value = raw.map(toTrack)
         } catch (e) {
             console.error('Failed to load playlist tracks:', e)
             currentTracks.value = []
@@ -113,9 +115,20 @@ export const usePlaylistStore = defineStore('playlist', () => {
         }
     }
 
+    function persistPlayingPlaylistId(id: number | null) {
+        const value = id === null ? 'null' : JSON.stringify(id)
+        invoke('set_setting', { key: 'playing-playlist-id', value }).catch(e => {
+            console.error('Failed to persist playing-playlist-id:', e)
+        })
+    }
+
+    function setPlayingPlaylist(id: number | null) {
+        playingPlaylistId.value = id
+        persistPlayingPlaylistId(id)
+    }
+
     function clearPlayingState() {
-        playingPlaylistId.value = null
-        invoke('set_setting', { key: 'playing-playlist-id', value: 'null' }).catch(() => {})
+        setPlayingPlaylist(null)
     }
 
     async function ensureDefaultPlaylist() {
@@ -132,9 +145,8 @@ export const usePlaylistStore = defineStore('playlist', () => {
         if (!defaultPlaylistId.value) await ensureDefaultPlaylist()
         if (defaultPlaylistId.value) {
             await addToPlaylist(defaultPlaylistId.value, paths)
-            playingPlaylistId.value = defaultPlaylistId.value
+            setPlayingPlaylist(defaultPlaylistId.value)
             if (currentPlaylistId.value !== defaultPlaylistId.value) {
-                invoke('set_setting', { key: 'playing-playlist-id', value: JSON.stringify(defaultPlaylistId.value) }).catch(() => {})
                 await selectPlaylist(defaultPlaylistId.value)
             }
         }
@@ -146,17 +158,18 @@ export const usePlaylistStore = defineStore('playlist', () => {
         try {
             const v = await invoke('get_setting', { key: 'playing-playlist-id' })
             if (v) playingPlaylistId.value = JSON.parse(v as string)
-        } catch {}
+        } catch (e) {
+            console.error('Failed to restore playing playlist id:', e)
+        }
         if (playingPlaylistId.value && playlists.value.some(p => p.id === playingPlaylistId.value)) {
             await selectPlaylist(playingPlaylistId.value)
         }
     }
 
-    init()
-
     return {
         playlists, defaultPlaylistId, currentPlaylistId, playingPlaylistId, currentTracks, isLoading,
-        loadPlaylists, createPlaylist,  deletePlaylist, renamePlaylist,
+        loadPlaylists, createPlaylist, deletePlaylist, renamePlaylist,
         selectPlaylist, addToPlaylist, removeFromPlaylist, clearPlayList, addToDefault, ensureDefaultPlaylist,
+        setPlayingPlaylist, clearPlayingState, init,
     }
 })

@@ -5,6 +5,7 @@ const props = defineProps<{
     items: any[]
     itemHeight: number
     overscan?: number
+    getKey?: (item: any, index: number) => string | number
 }>()
 
 const emit = defineEmits<{
@@ -87,7 +88,7 @@ defineExpose({ scrollToIndex, container })
     <div ref="container" class="virtual-list-container" @scroll="onScroll">
         <div class="virtual-list-spacer" :style="{ height: totalHeight + 'px'}">
             <div class="virtual-list-content" :style="{ transform: `translateY(${offsetY}px)` }">
-                <template v-for="{ item, index } in visibleItems" :key="index">
+                <template v-for="{ item, index } in visibleItems" :key="props.getKey ? props.getKey(item, index) : index">
                     <slot :item="item" :index="index" />
                 </template>
             </div>

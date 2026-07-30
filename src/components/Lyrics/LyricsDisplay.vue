@@ -19,6 +19,8 @@ const showContextMenu = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 
+let loadToken = 0
+
 function onContextMenu(e: MouseEvent) {
     if (!playerStore.currentTrack) return
     menuX.value = e.clientX
@@ -44,21 +46,36 @@ watch(currentLine, (idx) => {
 })
 
 watch(() => playerStore.currentTrack, async (track) => {
+    const myToken = ++loadToken
     lyricsLines.value = []
     currentLineIndex.value = -1
     noLyrics.value = false
 
     if (!track) return
-    await loadLyrics(track.path, track.title, track.artist, track.album, track.duration)
+    await loadLyrics(track.path, track.title, track.artist, track.album, track.duration, myToken)
 }, { immediate: true })
+
+let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
     updateSpacerHeight()
     window.addEventListener('resize', onResize)
+    if (containerRef.value) {
+        resizeObserver = new ResizeObserver(() => {
+            updateSpacerHeight()
+            nextTick(() => scrollToLine(currentLineIndex.value))
+        })
+        resizeObserver.observe(containerRef.value)
+    }
 })
 
 onUnmounted(() => {
     window.removeEventListener('resize', onResize)
+    if (resizeObserver) {
+        resizeObserver.disconnect()
+        resizeObserver = null
+    }
+    loadToken++
 })
 
 function onResize() {
@@ -74,16 +91,23 @@ function updateSpacerHeight() {
     }
 }
 
+function isCurrentLoad(token: number): boolean {
+    return token === loadToken
+}
+
 async function loadLyrics(
     path: string,
     title?: string,
     artist?: string,
     album?: string,
-    duration?: number
+    duration?: number,
+    token?: number,
 ) {
+    const myToken = token ?? ++loadToken
     isLoading.value = true
     try {
         const local: string | null = await invoke('read_local_lyrics', { audioPath: path })
+        if (!isCurrentLoad(myToken)) return
         if (local) {
             lyricsLines.value = parseLrc(local)
             if (lyricsLines.value.length > 0) return
@@ -101,20 +125,26 @@ async function loadLyrics(
                     }),
                     new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
                 ]) as string | null
+                if (!isCurrentLoad(myToken)) return
                 if (downloaded) {
                     lyricsLines.value = parseLrc(downloaded)
                     if (lyricsLines.value.length > 0) return
                 }
             } catch (e) {
-
+                if (!isCurrentLoad(myToken)) return
+                console.warn('Failed to download lyrics:', e)
             }
         }
+        if (!isCurrentLoad(myToken)) return
         noLyrics.value = true
     } catch (e) {
+        if (!isCurrentLoad(myToken)) return
         console.error('Failed to load lyrics:', e)
         noLyrics.value = true
     } finally {
-        isLoading.value = false
+        if (isCurrentLoad(myToken)) {
+            isLoading.value = false
+        }
     }
 }
 
@@ -139,7 +169,7 @@ function scrollToLine(index: number) {
             <div class="lyrics-spacer" :style="{ height: spacerHeight }"></div>
             <p
                 v-for="(line, index) in lyricsLines"
-                :key="index"
+                :key="line.time + '-' + index"
                 :data-line="index"
                 class="lyrics-line"
                 :class="{ active: index === currentLineIndex, past: index < currentLineIndex }"

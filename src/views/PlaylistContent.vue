@@ -2,9 +2,7 @@
 import { computed, watch, nextTick, ref, onMounted } from 'vue'
 import { usePlaylistStore } from '../stores/playlist'
 import { usePlayerStore } from '../stores/player'
-import { invoke } from '@tauri-apps/api/core'
 import { formatTime, stripExtension } from '../utils/format'
-import { toTrack } from '../types'
 import ContextMenu from '../components/ContextMenu.vue'
 import type { MenuItem } from '../components/ContextMenu.vue'
 
@@ -23,9 +21,8 @@ const selectedPlaylist = computed(() =>
 async function playPlaylist(index: number) {
     const tracks = playlistStore.currentTracks
     if (tracks.length === 0) return
-    playerStore.setPlaylist(tracks.map(toTrack), index)
-    playlistStore.playingPlaylistId = playlistStore.currentPlaylistId
-    invoke('set_setting', { key: 'playing-playlist-id', value: JSON.stringify(playlistStore.currentPlaylistId) }).catch(() => {})
+    playerStore.setPlaylist(tracks, index)
+    playlistStore.setPlayingPlaylist(playlistStore.currentPlaylistId)
 }
 
 function onTrackContextMenu(e: MouseEvent, path: string) {
@@ -102,8 +99,8 @@ const menuItems = computed<MenuItem[]>(() => {
                     @contextmenu="onTrackContextMenu($event, track.path)"
                 >
                     <span class="track-index">{{ index + 1 }}</span>
-                    <span class="track-title">{{ track.title || stripExtension(track.file_name) }}</span>
-                    <span class="track-duration">{{ formatTime(track.duration) }}</span>
+                    <span class="track-title">{{ track.title || stripExtension(track.fileName) }}</span>
+                    <span class="track-duration">{{ formatTime(track.duration ?? 0) }}</span>
                 </div>
             </div>
 

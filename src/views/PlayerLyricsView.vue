@@ -4,27 +4,17 @@ import PlayerLayout from '../components/Layout/PlayerLayout.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
 import CoverDisplay from '../components/Display/CoverDisplay.vue'
 import { usePlayerStore } from '../stores/player'
-import { generateGradient } from '../utils/cover-gradient'
-import { stripExtension } from '../utils/format'
+import { useTrackDisplay } from '../composables/useTrackDisplay'
 
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
-
-const displayTitle = computed(() => {
-    const track = playerStore.currentTrack
-    if (!track) return '未播放'
-    return track.title || stripExtension(track.fileName)
-})
-
-const displayArtist = computed(() => {
-    return playerStore.currentTrack?.artist || ''
-})
+const { coverGradient } = useTrackDisplay()
 
 const hasCover = computed(() => !!playerStore.currentTrack?.coverUrl)
 
 const dynamicBackground = computed(() => {
     if (hasCover.value) return {}
-    return { background: generateGradient(displayTitle.value, displayArtist.value) }
+    return coverGradient.value
 })
 </script>
 

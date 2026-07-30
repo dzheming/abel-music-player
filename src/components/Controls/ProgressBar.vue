@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { usePlayerStore } from '../../stores/player'
 import { formatTime } from '../../utils/format'
 
@@ -12,10 +12,28 @@ const variant = computed(() => props.variant ?? 'slider')
 
 const playerStore = usePlayerStore()
 
-const progressPercent = computed(() => playerStore.progress * 100)
+const isDragging = ref(false)
+const dragValue = ref(0)
 
-function onSeek(e: Event) {
+const progressPercent = computed(() => {
+    if (isDragging.value) return dragValue.value * 100
+    return playerStore.progress * 100
+})
+
+function onSeekStart(e: Event) {
+    isDragging.value = true
+    dragValue.value = parseFloat((e.target as HTMLInputElement).value) / 100
+}
+
+function onSeekMove(e: Event) {
+    if (!isDragging.value) return
+    dragValue.value = parseFloat((e.target as HTMLInputElement).value) / 100
+}
+
+function onSeekEnd(e: Event) {
+    if (!isDragging.value) return
     const value = parseFloat((e.target as HTMLInputElement).value)
+    isDragging.value = false
     playerStore.seek(value / 100)
 }
 
@@ -37,7 +55,10 @@ function onBarClick(e: MouseEvent) {
             max="100"
             step="0.1"
             :value="progressPercent"
-            @input="onSeek"
+            @input="onSeekMove"
+            @mousedown="onSeekStart"
+            @touchstart="onSeekStart"
+            @change="onSeekEnd"
         />
         <span v-if="!props.hideTime" class="time-label">{{ formatTime(playerStore.duration) }}</span>
     </div>

@@ -19,6 +19,9 @@ pub struct PlaylistTrack {
     pub artist: Option<String>,
     pub album: Option<String>,
     pub duration: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cover: Option<String>,
+    pub track_number: Option<u32>,
     pub position: i64,
 }
 
@@ -143,7 +146,8 @@ pub fn get_playlist_tracks(playlist_id: i64, state: tauri::State<'_, DbState>) -
         "SELECT pt.path, pt.position,
                 COALESCE(tc.file_name, '') as file_name,
                 tc.title, tc.artist, tc.album,
-                COALESCE(tc.duration, 0) as duration
+                COALESCE(tc.duration, 0) as duration,
+                tc.track_number
         FROM playlist_tracks pt
         LEFT JOIN track_cache tc ON tc.path = pt.path
         WHERE pt.playlist_id = ?1
@@ -158,6 +162,8 @@ pub fn get_playlist_tracks(playlist_id: i64, state: tauri::State<'_, DbState>) -
             artist: row.get(4)?,
             album: row.get(5)?,
             duration: row.get(6)?,
+            cover: None,
+            track_number: row.get(7)?,
         })
     }).map_err(|e| e.to_string())?;
     let mut result = Vec::new();

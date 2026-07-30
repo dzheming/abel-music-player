@@ -5,6 +5,8 @@ use super::database::DbState;
 use super::library::{get_excluded_folders_from_db, normalize_path};
 use super::AUDIO_EXTENSIONS;
 
+const MAX_SCAN_DEPTH: usize = 32;
+
 fn is_excluded(path: &str, excluded: &[String]) -> bool {
     let norm = normalize_path(path);
     excluded.iter().any(|ex| {
@@ -27,7 +29,8 @@ pub fn scan_music_folder(path: String, state: tauri::State<'_, DbState>) -> Resu
     let mut audio_files: Vec<String> = Vec::new();
 
     for entry in WalkDir::new(dir)
-        .follow_links(true)
+        .follow_links(false)
+        .max_depth(MAX_SCAN_DEPTH)
         .into_iter()
         .filter_entry(|e| {
             if e.file_type().is_dir() {

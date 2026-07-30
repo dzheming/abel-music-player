@@ -93,6 +93,11 @@ const flatItems = computed<FlatItem[]>(() => {
     return result
 })
 
+// 为 VirtualList 提供稳定的 key：目录用 'dir:' 前缀，曲目用 path
+function getVirtualListItemKey(item: FlatItem): string {
+    return item.type === 'dir' ? `dir:${item.dir}` : `track:${item.file.path}`
+}
+
 const showingGlobalSearch = computed(() => !!libraryStore.globalSearchQuery)
 
 const folderName = computed(() => {
@@ -213,6 +218,7 @@ onUnmounted(() => window.removeEventListener('player-view-closed', onPlayerViewC
                 :items="flatItems"
                 :item-height="ITEM_HEIGHT"
                 :overscan="20"
+                :get-key="getVirtualListItemKey"
                 class="music-list"
             >
                 <template #default="{ item }">

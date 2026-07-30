@@ -5,9 +5,9 @@ use super::portable::get_portable_dir;
 
 pub struct DbState(pub Mutex<Connection>);
 
-pub fn init_db() -> Connection {
+pub fn init_db() -> Result<Connection, String> {
     let db_path = get_portable_dir().join("abel-music.db");
-    let conn = Connection::open(db_path).expect("failed to open database");
+    let conn = Connection::open(db_path).map_err(|e| format!("failed to open database: {}", e))?;
 
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS playlists (
@@ -31,7 +31,6 @@ pub fn init_db() -> Connection {
             album TEXT,
             duration REAL NOT NULL DEFAULT 0,
             track_number INTEGER,
-            cover_hash TEXT,
             excluded INTEGER NOT NULL DEFAULT 0,
             scanned_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
@@ -55,7 +54,12 @@ pub fn init_db() -> Connection {
         CREATE INDEX IF NOT EXISTS idx_library_folders_parent ON library_folders(parent_path);
         PRAGMA journal_mode=WAL;
         PRAGMA foreign_keys=ON;"
-    ).expect("failed to init database tables");
+    ).map_err(|e| format!("failed to init database tables: {}", e))?;
 
-    conn
+    conn.execute_batch(
+        "CREATE INDEX IF NOT EXISTS idx_track_cache_excluded_artist ON track_cache(excluded, artist);
+            CREATE INDEX IF NOT EXISTS idx_track_cache_excluded_album ON track_cache(excluded, album);"
+    ).map_err(|e| format!("failed to create additional indexes: {}", e))?;
+
+    Ok(conn)
 }

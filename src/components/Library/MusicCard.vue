@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { usePlayerStore } from '../../stores/player'
 import { formatTime } from '../../utils/format'
@@ -21,6 +21,8 @@ const playerStore = usePlayerStore()
 const { showMenu, menuX, menuY, onContextMenu, menuItems } = useTrackContextMenu(() => props.file.path)
 const lazyCover = ref<string | undefined>(props.file.coverUrl)
 const cardRef = ref<HTMLElement | null>(null)
+let coverObserver: IntersectionObserver | null = null
+let isMounted = true
 
 const displayTitle = computed(() => {
     return props.file.title || stripExtension(props.file.fileName)
@@ -37,15 +39,25 @@ const gradientStyle = computed(() => {
 
 onMounted(() => {
     if (lazyCover.value) return
-    const observer = new IntersectionObserver((entries) => {
+    coverObserver = new IntersectionObserver((entries) => {
         if (entries[0].isIntersecting) {
-            observer.disconnect()
+            coverObserver?.disconnect()
+            coverObserver = null
             invoke<string | null>('read_cover', { path: props.file.path }).then(cover => {
+                if (!isMounted) return
                 if (cover) lazyCover.value = cover
             }).catch(() => {})
         }
     }, { rootMargin: '200px' })
-    if (cardRef.value) observer.observe(cardRef.value)
+    if (cardRef.value) coverObserver.observe(cardRef.value)
+})
+
+onUnmounted(() => {
+    isMounted = false
+    if (coverObserver) {
+        coverObserver.disconnect()
+        coverObserver = null
+    }
 })
 
 function onDblClick() {

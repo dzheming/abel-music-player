@@ -145,13 +145,15 @@ pub fn add_library_folder(path: String, state: tauri::State<'_, DbState>) -> Res
     for root in &roots {
         if is_sub_path(&norm, root) && norm != *root {
             let pattern = format!("{}/%", norm);
-            conn.execute(
+            let track_pattern = format!("{}/%", norm);
+            let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+            tx.execute(
                 "UPDATE library_folders SET excluded = 0 WHERE path = ?1 OR path LIKE ?2",
                 params![norm, pattern],
             ).map_err(|e| e.to_string())?;
-            let track_pattern = format!("{}%", norm);
-            conn.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
+            tx.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
                 .map_err(|e| e.to_string())?;
+            tx.commit().map_err(|e| e.to_string())?;
             sync_folder_tree_inner(&conn, root)?;
             return Ok(root.clone());
         }
@@ -161,14 +163,15 @@ pub fn add_library_folder(path: String, state: tauri::State<'_, DbState>) -> Res
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| norm.clone());
 
-    conn.execute(
+    let track_pattern = format!("{}/%", norm);
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute(
         "INSERT OR IGNORE INTO library_folders (path, name, parent_path, is_root, excluded, audio_count) VALUES (?1, ?2, NULL, 1, 0, 0)",
         params![norm, name],
     ).map_err(|e| e.to_string())?;
-
-    let track_pattern = format!("{}%", norm);
-    conn.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
 
     sync_folder_tree_inner(&conn, &norm)?;
     Ok(norm)
@@ -179,13 +182,15 @@ pub fn remove_library_folder(path: String, state: tauri::State<'_, DbState>) -> 
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let norm = normalize_path(&path);
     let pattern = format!("{}/%", norm);
-    conn.execute("DELETE FROM library_folders WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
+    let track_pattern = format!("{}/%", norm);
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM library_folders WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
         .map_err(|e| e.to_string())?;
-    let track_pattern = format!("{}%", norm);
-    conn.execute("DELETE FROM playlist_tracks WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("DELETE FROM playlist_tracks WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
-    conn.execute("UPDATE track_cache SET excluded = 1 WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("UPDATE track_cache SET excluded = 1 WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -194,13 +199,15 @@ pub fn exclude_folder(path: String, state: tauri::State<'_, DbState>) -> Result<
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let norm = normalize_path(&path);
     let pattern = format!("{}/%", norm);
-    conn.execute("UPDATE library_folders SET excluded = 1 WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
+    let track_pattern = format!("{}/%", norm);
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("UPDATE library_folders SET excluded = 1 WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
         .map_err(|e| e.to_string())?;
-    let track_pattern = format!("{}%", norm);
-    conn.execute("DELETE FROM playlist_tracks WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("DELETE FROM playlist_tracks WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
-    conn.execute("UPDATE track_cache SET excluded = 1 WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("UPDATE track_cache SET excluded = 1 WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -209,11 +216,13 @@ pub fn restore_folder(path: String, state: tauri::State<'_, DbState>) -> Result<
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     let norm = normalize_path(&path);
     let pattern = format!("{}/%", norm);
-    conn.execute("UPDATE library_folders SET excluded = 0 WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
+    let track_pattern = format!("{}/%", norm);
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    tx.execute("UPDATE library_folders SET excluded = 0 WHERE path = ?1 OR path LIKE ?2", params![norm, pattern])
         .map_err(|e| e.to_string())?;
-    let track_pattern = format!("{}%", norm);
-    conn.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
+    tx.execute("UPDATE track_cache SET excluded = 0 WHERE path LIKE ?1", params![track_pattern])
         .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 

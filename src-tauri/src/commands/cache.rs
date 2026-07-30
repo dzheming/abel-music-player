@@ -1,5 +1,5 @@
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use rusqlite::params;
+use rusqlite::{params, Row};
 use serde::{Deserialize, Serialize};
 
 use super::database::DbState;
@@ -30,6 +30,19 @@ pub struct AlbumGroup {
     pub track_count: i64,
 }
 
+fn row_to_track(row: &Row) -> rusqlite::Result<TrackMetadata> {
+    Ok(TrackMetadata {
+        path: row.get(0)?,
+        file_name: row.get(1)?,
+        title: row.get(2)?,
+        artist: row.get(3)?,
+        album: row.get(4)?,
+        duration: row.get(5)?,
+        track_number: row.get(6)?,
+        cover: None,
+    })
+}
+
 #[tauri::command]
 pub fn get_cached_tracks_for_paths(paths: Vec<String>, state: tauri::State<'_, DbState>) -> Result<Vec<TrackMetadata>, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
@@ -43,18 +56,7 @@ pub fn get_cached_tracks_for_paths(paths: Vec<String>, state: tauri::State<'_, D
         );
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
         let params: Vec<&dyn rusqlite::types::ToSql> = chunk.iter().map(|s| s as &dyn rusqlite::types::ToSql).collect();
-        let rows = stmt.query_map(params.as_slice(), |row| {
-            Ok(TrackMetadata {
-                path: row.get(0)?,
-                file_name: row.get(1)?,
-                title: row.get(2)?,
-                artist: row.get(3)?,
-                album: row.get(4)?,
-                duration: row.get(5)?,
-                track_number: row.get(6)?,
-                cover: None,
-            })
-        }).map_err(|e| e.to_string())?;
+        let rows = stmt.query_map(params.as_slice(), row_to_track).map_err(|e| e.to_string())?;
         for row in rows {
             if let Ok(track) = row {
                 result.push(track);
@@ -88,12 +90,16 @@ pub fn clear_track_cache(state: tauri::State<'_, DbState>) -> Result<(), String>
 
 #[tauri::command]
 pub fn cleanup_stale_cache(state: tauri::State<'_, DbState>) -> Result<u64, String> {
-    let conn = state.0.lock().map_err(|e| e.to_string())?;
-    let mut stmt = conn.prepare("SELECT path FROM track_cache").map_err(|e| e.to_string())?;
-    let paths: Vec<String> = stmt.query_map([], |row| row.get(0))
-        .map_err(|e| e.to_string())?
-        .filter_map(|r| r.ok())
-        .collect();
+    let paths: Vec<String> = {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn.prepare("SELECT path FROM track_cache").map_err(|e| e.to_string())?;
+        let rows = stmt.query_map([], |row| row.get(0)).map_err(|e| e.to_string())?;
+        let mut v = Vec::new();
+        for r in rows {
+            if let Ok(p) = r { v.push(p); }
+        }
+        v
+    };
 
     let stale: Vec<String> = paths.into_par_iter()
         .filter(|p| !std::path::Path::new(p.as_str()).exists())
@@ -101,6 +107,7 @@ pub fn cleanup_stale_cache(state: tauri::State<'_, DbState>) -> Result<u64, Stri
     let count = stale.len() as u64;
 
     if count > 0 {
+        let conn = state.0.lock().map_err(|e| e.to_string())?;
         let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
         for chunk in stale.chunks(super::SQL_BATCH_SIZE) {
             let placeholders: String = chunk.iter().map(|_| "?").collect::<Vec<_>>().join(",");
@@ -172,18 +179,7 @@ pub fn get_tracks_by_artist(artist: String, state: tauri::State<'_, DbState>) ->
         WHERE COALESCE(artist, '未知歌手') = ?1  AND excluded = 0
         ORDER BY album, track_number, title, file_name"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![artist], |row| {
-        Ok(TrackMetadata {
-            path: row.get(0)?,
-            file_name: row.get(1)?,
-            title: row.get(2)?,
-            artist: row.get(3)?,
-            album: row.get(4)?,
-            duration: row.get(5)?,
-            track_number: row.get(6)?,
-            cover: None,
-        })
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![artist], row_to_track).map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);
@@ -201,18 +197,7 @@ pub fn search_tracks(query: String, state: tauri::State<'_, DbState>) -> Result<
         ORDER BY title, file_name
         LIMIT 200"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![pattern], |row| {
-        Ok(TrackMetadata {
-            path: row.get(0)?,
-            file_name: row.get(1)?,
-            title: row.get(2)?,
-            artist: row.get(3)?,
-            album: row.get(4)?,
-            duration: row.get(5)?,
-            track_number: row.get(6)?,
-            cover: None,
-        })
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![pattern], row_to_track).map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);
@@ -228,18 +213,7 @@ pub fn get_tracks_by_album(album: String, state: tauri::State<'_, DbState>) -> R
         WHERE COALESCE(album, '未知专辑') = ?1 AND excluded = 0
         ORDER BY track_number, title, file_name"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![album], |row| {
-        Ok(TrackMetadata {
-            path: row.get(0)?,
-            file_name: row.get(1)?,
-            title: row.get(2)?,
-            artist: row.get(3)?,
-            album: row.get(4)?,
-            duration: row.get(5)?,
-            track_number: row.get(6)?,
-            cover: None,
-        })
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![album], row_to_track).map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);
@@ -254,18 +228,7 @@ pub fn get_random_tracks(count: i64, state: tauri::State<'_, DbState>) -> Result
         "SELECT path, file_name, title, artist, album, duration, track_number FROM track_cache
         WHERE excluded = 0 ORDER BY RANDOM() LIMIT ?1"
     ).map_err(|e| e.to_string())?;
-    let rows = stmt.query_map(params![count], |row| {
-        Ok(TrackMetadata {
-            path: row.get(0)?,
-            file_name: row.get(1)?,
-            title: row.get(2)?,
-            artist: row.get(3)?,
-            album: row.get(4)?,
-            duration: row.get(5)?,
-            track_number: row.get(6)?,
-            cover: None,
-        })
-    }).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(params![count], row_to_track).map_err(|e| e.to_string())?;
     let mut result = Vec::new();
     for row in rows {
         result.push(row.map_err(|e| e.to_string())?);

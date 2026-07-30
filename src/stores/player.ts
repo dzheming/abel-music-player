@@ -7,7 +7,7 @@ import { useAudioEffects } from '../composables/useAudioEffects'
 import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
 import { adjustBrightness } from '../utils/color'
-import { extractDominantColor } from '../utils/extract-color'
+import { extractDominantColorCancelable } from '../utils/extract-color'
 import { toTrack } from '../types'
 import type { Track, RawTrack } from '../types'
 
@@ -297,37 +297,48 @@ export const usePlayerStore = defineStore('player', () => {
         }
     }
 
-    let mediaKeysEnabled = true
-    invoke('get_setting', { key: 'media-keys' }).then(v => {
-        if (v) mediaKeysEnabled = v !== 'false'
-    }).catch(() => {})
+    const settingsStore = useSettingsStore()
 
-    function isMediaKeysEnabled(): boolean {
-        return mediaKeysEnabled
-    }
     if ('mediaSession' in navigator) {
-        navigator.mediaSession.setActionHandler('play', () => { if (isMediaKeysEnabled()) togglePlay() })
-        navigator.mediaSession.setActionHandler('pause', () => { if (isMediaKeysEnabled()) togglePlay() })
-        navigator.mediaSession.setActionHandler('previoustrack', () => { if (isMediaKeysEnabled()) prev() })
-        navigator.mediaSession.setActionHandler('nexttrack', () => { if (isMediaKeysEnabled()) next() })
+        navigator.mediaSession.setActionHandler('play', () => { if (settingsStore.mediaKeysEnabled) togglePlay() })
+        navigator.mediaSession.setActionHandler('pause', () => { if (settingsStore.mediaKeysEnabled) togglePlay() })
+        navigator.mediaSession.setActionHandler('previoustrack', () => { if (settingsStore.mediaKeysEnabled) prev() })
+        navigator.mediaSession.setActionHandler('nexttrack', () => { if (settingsStore.mediaKeysEnabled) next() })
     }
 
     restorePlayState().finally(() => { isRestoringState.value = false })
 
     let systemAccentColor: string | null = null
-    invoke<string>('get_system_accent_color').then(c => { systemAccentColor = c }).catch(() => {})
+    invoke<string>('get_system_accent_color').then(c => {
+        systemAccentColor = c
+        if (!currentTrack.value?.coverUrl && systemAccentColor) {
+            applyAccentColor(systemAccentColor)
+        }
+    }).catch(() => {})
 
+    function applyAccentColor(color: string) {
+        document.documentElement.style.setProperty('--color-accent', color)
+        document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(color, -20))
+    }
+
+    let pendingColorExtract: { cancel: () => void } | null = null
     watch(() => currentTrack.value?.coverUrl, (coverUrl) => {
+        if (pendingColorExtract) {
+            pendingColorExtract.cancel()
+            pendingColorExtract = null
+        }
         if (coverUrl) {
-            extractDominantColor(coverUrl).then(color => {
-                if (color) {
-                    document.documentElement.style.setProperty('--color-accent', color)
-                    document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(color, -20))
-                }
+            const { promise, cancel } = extractDominantColorCancelable(coverUrl)
+            pendingColorExtract = { cancel }
+            promise.then(color => {
+                pendingColorExtract = null
+                if (color) applyAccentColor(color)
             })
         } else if (systemAccentColor) {
-            document.documentElement.style.setProperty('--color-accent', systemAccentColor)
-            document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(systemAccentColor, -20))
+            applyAccentColor(systemAccentColor)
+        } else {
+            const defaultAccent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-default').trim()
+            if (defaultAccent) applyAccentColor(defaultAccent)
         }
     })
 

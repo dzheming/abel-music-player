@@ -175,16 +175,22 @@ export const useLibraryStore = defineStore('library', () => {
     }
 
     async function backgroundScanAll() {
+        const myGen = ++scanGeneration
         for (const folder of folders.value) {
+            if (myGen !== scanGeneration) return
             try {
                 const files: string[] = await invoke('scan_music_folder', { path: folder.path })
+                if (myGen !== scanGeneration) return
                 const cached: RawTrack[] = await invoke('get_cached_tracks_for_paths', { paths: files })
+                if (myGen !== scanGeneration) return
                 const cachedPaths = new Set(cached.map(c => c.path))
                 const uncachedPaths = files.filter(f => !cachedPaths.has(f))
 
                 if (uncachedPaths.length > 0) {
                     const metadataList: RawTrack[] = await invoke('read_metadata_batch', { paths: uncachedPaths })
+                    if (myGen !== scanGeneration) return
                     await invoke('cache_tracks', { tracks: metadataList })
+                    if (myGen !== scanGeneration) return
                     if (selectedFolderPath.value?.startsWith(folder.path)) {
                         await loadFromCache(selectedFolderPath.value)
                     }
@@ -232,7 +238,7 @@ export const useLibraryStore = defineStore('library', () => {
 
                 const unlistenMeta = await listen<RawTrack[]>('metadata-batch-chunk', (event) => {
                     if (myGen !== scanGeneration) return
-                    audioFiles.value = [...audioFiles.value, ...event.payload.map(toTrack)]
+                    audioFiles.value.push(...event.payload.map(toTrack))
                     scanProgress.value = `已加载 ${audioFiles.value.length} / ${files.length} 首...`
                 })
                 try {
@@ -242,7 +248,7 @@ export const useLibraryStore = defineStore('library', () => {
                     const allPaths = new Set(audioFiles.value.map(f => f.path))
                     const missing = metadataList.filter(m => !allPaths.has(m.path))
                     if (missing.length > 0) {
-                        audioFiles.value = [...audioFiles.value, ...missing.map(toTrack)]
+                        audioFiles.value.push(...missing.map(toTrack))
                     }
 
                     await invoke('cache_tracks', { tracks: metadataList })

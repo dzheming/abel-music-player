@@ -3,8 +3,14 @@ use serde::Serialize;
 use std::fs;
 use std::path::Path;
 use std::sync::LazyLock;
+use std::time::Duration;
 
-static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(reqwest::Client::new);
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("failed to build reqwest client")
+});
 
 fn save_lrc(audio_path: &str, content: &str) {
     let audio = Path::new(audio_path);

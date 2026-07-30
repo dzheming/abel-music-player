@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { useLibraryStore } from '../../stores/library'
@@ -33,6 +33,22 @@ function shouldAutoExpand(): boolean {
 }
 
 const expanded = ref(shouldAutoExpand())
+
+watch(() => libraryStore.selectedFolderPath, (newPath, oldPath) => {
+    if (!newPath) return
+    if (!expanded.value && shouldAutoExpand()) {
+        expanded.value = true
+        return
+    }
+    if (oldPath && newPath) {
+        const nold = normalizePath(oldPath)
+        const nnew = normalizePath(newPath)
+        const np = normalizePath(props.node.path)
+        if (!nnew.startsWith(np + '/') && nnew !== np && nold.startsWith(np + '/')) {
+            expanded.value = shouldAutoExpand()
+        }
+    }
+})
 
 function toggle() {
     if (props.node.children.length > 0) {

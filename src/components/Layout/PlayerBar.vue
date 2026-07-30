@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '../../stores/player'
-import { stripExtension } from '../../utils/format'
-import { generateGradient } from '../../utils/cover-gradient'
+import { useEqPanel } from '../../composables/useEqPanel'
+import { useTrackDisplay } from '../../composables/useTrackDisplay'
 import ProgressBar from '../Controls/ProgressBar.vue'
 import PlayControls from '../Controls/PlayControls.vue'
 import VolumeControl from '../Controls/VolumeControl.vue'
@@ -10,42 +9,8 @@ import EffectsPanel from '../Effects/EffectsPanel.vue'
 
 const emit = defineEmits<{ openPlayer: [] }>()
 const playerStore = usePlayerStore()
-const showEq = ref(false)
-const eqBtnRef = ref<HTMLElement | null>(null)
-const eqPanelRef = ref<HTMLElement | null>(null)
-
-function toggleEqPanel() {
-    showEq.value = !showEq.value
-}
-
-function onClickOutside(e: MouseEvent) {
-    if (
-        showEq.value &&
-        eqPanelRef.value && !eqPanelRef.value.contains(e.target as Node) &&
-        eqBtnRef.value && !eqBtnRef.value.contains(e.target as Node)
-    ) {
-        showEq.value = false
-    }
-}
-
-onMounted(() => document.addEventListener('mousedown', onClickOutside))
-onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
-
-const displayTitle = computed(() => {
-    if (playerStore.isRestoringState) return '加载中...'
-    const track = playerStore.currentTrack
-    if (!track) return '未播放'
-    return track.title || stripExtension(track.fileName)
-})
-
-const displayArtist = computed(() => {
-    return playerStore.currentTrack?.artist || ''
-})
-
-const coverGradient = computed(() => {
-    if (!playerStore.currentTrack || playerStore.currentTrack.coverUrl) return {}
-    return { background: generateGradient(displayTitle.value, displayArtist.value) }
-})
+const { showEq, eqBtnRef, eqPanelRef, toggleEqPanel } = useEqPanel()
+const { displayTitle, displayArtist, coverGradient } = useTrackDisplay()
 </script>
 
 <template>

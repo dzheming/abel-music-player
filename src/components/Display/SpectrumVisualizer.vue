@@ -7,11 +7,11 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let animationId: number | null = null
 let analyser: AnalyserNode | null = null
 let accentColor = '#0a84ff'
-let frameCount = 0
+
+let accentObserver: MutationObserver | null = null
 
 function refreshAccentColor() {
     accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#0a84ff'
-    frameCount = 0
 }
 
 onMounted(() => {
@@ -21,17 +21,42 @@ onMounted(() => {
         console.error('Failed to init analyser: ', e)
     }
     refreshAccentColor()
-    animationId = requestAnimationFrame(draw)
+    accentObserver = new MutationObserver(() => refreshAccentColor())
+    accentObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
+
+    if (canvasRef.value) {
+        intersectionObserver = new IntersectionObserver((entries) => {
+            const visible = entries[0]?.isIntersecting ?? false
+            if (visible && animationId === null) {
+                animationId = requestAnimationFrame(draw)
+            } else if (!visible && animationId !== null) {
+                cancelAnimationFrame(animationId)
+                animationId = null
+            }
+        })
+        intersectionObserver.observe(canvasRef.value)
+    }
 })
 
+let intersectionObserver: IntersectionObserver | null = null
+
 onUnmounted(() => {
-    if (animationId) cancelAnimationFrame(animationId)
+    if (animationId) {
+        cancelAnimationFrame(animationId)
+        animationId = null
+    }
+    if (accentObserver) {
+        accentObserver.disconnect()
+        accentObserver = null
+    }
+    if (intersectionObserver) {
+        intersectionObserver.disconnect()
+        intersectionObserver = null
+    }
 })
 
 function draw() {
     animationId = requestAnimationFrame(draw)
-
-    if (++frameCount % 30 === 0) refreshAccentColor()
 
     if (!canvasRef.value || !analyser) return
 

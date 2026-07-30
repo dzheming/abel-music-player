@@ -20,7 +20,7 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
         const v = Math.round(l * 255)
         return [v, v, v]
     }
-    
+
     const hue2rgb = (p: number, q: number, t: number) => {
         if (t < 0) t += 1
         if (t > 1) t -= 1
@@ -46,11 +46,19 @@ function complementaryWithMinLightness(r: number, g: number, b: number, minL: nu
     return hslToRgb(h, s, l)
 }
 
-export function extractDominantColor(imageUrl: string): Promise<string | null> {
-    return new Promise((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
+export interface CancelableColorResult {
+    promise: Promise<string | null>
+    cancel: () => void
+}
+
+export function extractDominantColorCancelable(imageUrl: string): CancelableColorResult {
+    let cancelled = false
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    const promise = new Promise<string | null>((resolve) => {
         img.onload = () => {
+            if (cancelled) { resolve(null); return }
             const canvas = document.createElement('canvas')
             const size = 64
             canvas.width = size
@@ -107,4 +115,16 @@ export function extractDominantColor(imageUrl: string): Promise<string | null> {
         img.onerror = () => resolve(null)
         img.src = imageUrl
     })
+
+    return {
+        promise,
+        cancel: () => {
+            cancelled = true
+            img.src = ''
+        },
+    }
+}
+
+export function extractDominantColor(imageUrl: string): Promise<string | null> {
+    return extractDominantColorCancelable(imageUrl).promise
 }
