@@ -26,7 +26,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <PlayerLayout @close="emit('close')">
+    <PlayerLayout hide-header-info @close="emit('close')">
         <template #default="{ title, artist, coverGradient }">
             <div class="main-row">
                 <div class="title-row">
@@ -108,7 +108,6 @@ onUnmounted(() => {
 }
 
 .lyrics-section :deep(.lyrics-display) {
-    height: 100%;
     padding: 0 16px;
     text-align: center;
 }

@@ -6,14 +6,18 @@ import TitleBar from './components/Layout/TitleBar.vue'
 import Sidebar from './components/Layout/Sidebar.vue'
 import PlayerBar from './components/Layout/PlayerBar.vue'
 import PlayerView from './views/PlayerView.vue'
+import PlayerRecordView from './views/PlayerRecordView.vue'
 import PlayerTimeView from './views/PlayerTimeView.vue'
+import PlayerLyricsView from './views/PlayerLyricsView.vue'
 
 const playerStore = usePlayerStore()
 const showPlayerView = ref(false)
 
 const playerViewComponent = computed(() => {
     switch (playerStore.playerViewStyle) {
+        case 'record': return PlayerRecordView
         case 'time': return PlayerTimeView
+        case 'lyrics': return PlayerLyricsView
         default: return PlayerView
     }
 })

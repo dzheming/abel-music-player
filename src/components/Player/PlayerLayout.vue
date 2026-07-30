@@ -8,7 +8,7 @@ import ProgressBar from './ProgressBar.vue'
 import VolumeControl from './VolumeControl.vue'
 import EffectsPanel from './EffectsPanel.vue'
 
-const props = defineProps<{ hideFooter?: boolean }>()
+const props = defineProps<{ hideFooter?: boolean; hideHeaderInfo?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const playerStore = usePlayerStore()
 
@@ -33,7 +33,7 @@ function onEqClickOutside(e: MouseEvent) {
 onMounted(() => document.addEventListener('mousedown', onEqClickOutside))
 onUnmounted(() => document.removeEventListener('mousedown', onEqClickOutside))
 
-const VIEW_STYLES = ['default', 'time']
+const VIEW_STYLES = ['default', 'time', 'lyrics', 'record']
 
 function cycleViewStyle() {
     const idx = VIEW_STYLES.indexOf(playerStore.playerViewStyle)
@@ -55,7 +55,6 @@ const coverGradient = computed(() => {
     return { background: generateGradient(displayTitle.value, displayArtist.value) }
 })
 
-defineExpose({ displayTitle, displayArtist, coverGradient })
 </script>
 
 <template>
@@ -68,7 +67,12 @@ defineExpose({ displayTitle, displayArtist, coverGradient })
         <div class="layout-content">
             <div class="layout-header" data-tauri-drag-region>
                 <slot name="header" :title="displayTitle" :artist="displayArtist">
-                    <div class="header-info" data-tauri-drag-region></div>
+                    <div class="header-info" data-tauri-drag-region>
+                        <template v-if="!props.hideHeaderInfo">
+                            <span class="header-title" data-tauri-drag-region>{{ displayTitle }}</span>
+                            <span v-if="displayArtist" class="header-artist" data-tauri-drag-region> - {{ displayArtist }}</span>
+                        </template>
+                    </div>
                 </slot>
                 <div class="header-actions">
                     <button class="style-btn" @click="cycleViewStyle" title="切换风格">
@@ -170,6 +174,24 @@ defineExpose({ displayTitle, displayArtist, coverGradient })
     flex-shrink: 0;
 }
 
+.header-info {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.header-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.header-artist {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
 .style-btn {
     display: flex;
     align-items: center;
@@ -189,13 +211,6 @@ defineExpose({ displayTitle, displayArtist, coverGradient })
 .style-btn svg {
     width: 16px;
     height: 16px;
-}
-
-.header-info {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .close-btn {

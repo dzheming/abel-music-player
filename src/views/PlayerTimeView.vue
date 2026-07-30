@@ -27,13 +27,6 @@ onUnmounted(() => {
 
 <template>
     <PlayerLayout hide-footer @close="emit('close')">
-        <template #header="{ title, artist }">
-            <div class="header-info" data-tauri-drag-region>
-                <span class="header-title" data-tauri-drag-region>{{ title }}</span>
-                <span v-if="artist" class="header-artist" data-tauri-drag-region> - {{ artist }}</span>
-            </div>
-        </template>
-
         <div class="time-body">
             <div class="time-section">
                 <span class="time-hours">{{ timeH }}</span>
@@ -48,24 +41,6 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.header-info {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.header-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: #fff;
-}
-
-.header-artist {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.7);
-}
-
 .time-body {
     flex: 1;
     display: flex;
@@ -112,7 +87,6 @@ onUnmounted(() => {
 }
 
 .lyrics-section :deep(.lyrics-display) {
-    height: 100%;
     padding: 0 48px;
     text-align: center;
 }

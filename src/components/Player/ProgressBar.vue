@@ -5,6 +5,7 @@ import { formatTime } from '../../utils/format'
 
 const props = defineProps<{
     variant?: 'slider' | 'bar'
+    hideTime?: boolean
 }>()
 
 const variant = computed(() => props.variant ?? 'slider')
@@ -28,7 +29,7 @@ function onBarClick(e: MouseEvent) {
 
 <template>
     <div v-if="variant === 'slider'" class="progress-bar">
-        <span class="time-label">{{ formatTime(playerStore.currentTime) }}</span>
+        <span v-if="!props.hideTime" class="time-label">{{ formatTime(playerStore.currentTime) }}</span>
         <input
             type="range"
             class="progress-slider"
@@ -38,7 +39,7 @@ function onBarClick(e: MouseEvent) {
             :value="progressPercent"
             @input="onSeek"
         />
-        <span class="time-label">{{ formatTime(playerStore.duration) }}</span>
+        <span v-if="!props.hideTime" class="time-label">{{ formatTime(playerStore.duration) }}</span>
     </div>
 
     <div v-else class="progress-bar-bar" @click="onBarClick">
