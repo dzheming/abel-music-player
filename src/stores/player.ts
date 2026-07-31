@@ -6,7 +6,6 @@ import { useEqualizer, EQ_FREQUENCIES } from '../composables/useEqualizer'
 import { useAudioEffects } from '../composables/useAudioEffects'
 import { useSettingsStore } from './settings'
 import { stripExtension } from '../utils/format'
-import { adjustBrightness } from '../utils/color'
 import { extractDominantColorCancelable } from '../utils/extract-color'
 import { toTrack } from '../types'
 import type { Track, RawTrack } from '../types'
@@ -339,19 +338,6 @@ export const usePlayerStore = defineStore('player', () => {
 
     restorePlayState().finally(() => { isRestoringState.value = false })
 
-    let systemAccentColor: string | null = null
-    invoke<string>('get_system_accent_color').then(c => {
-        systemAccentColor = c
-        if (!currentTrack.value?.coverUrl && systemAccentColor) {
-            applyAccentColor(systemAccentColor)
-        }
-    }).catch(() => {})
-
-    function applyAccentColor(color: string) {
-        document.documentElement.style.setProperty('--color-accent', color)
-        document.documentElement.style.setProperty('--color-accent-hover', adjustBrightness(color, -20))
-    }
-
     let pendingColorExtract: { cancel: () => void } | null = null
     watch(() => currentTrack.value?.coverUrl, (coverUrl) => {
         if (pendingColorExtract) {
@@ -363,13 +349,10 @@ export const usePlayerStore = defineStore('player', () => {
             pendingColorExtract = { cancel }
             promise.then(color => {
                 pendingColorExtract = null
-                if (color) applyAccentColor(color)
+                if (color) settingsStore.applyAccentColor(color)
             })
-        } else if (systemAccentColor) {
-            applyAccentColor(systemAccentColor)
         } else {
-            const defaultAccent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent-default').trim()
-            if (defaultAccent) applyAccentColor(defaultAccent)
+            settingsStore.applyAccentColor(settingsStore.accentColor)
         }
     })
 

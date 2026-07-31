@@ -81,8 +81,8 @@ export const useSettingsStore = defineStore('settings', () => {
     watch(theme, applyTheme, { immediate: true })
     loadSystemAccentColor()
 
-    return { 
+    return {
         theme, accentColor, closeToTray, mediaKeysEnabled, preventSleep, viewMode,
-        toggleTheme, toggleCloseToTray, toggleMediaKeys, togglePreventSleep, toggleViewMode, loadSystemAccentColor,
+        toggleTheme, toggleCloseToTray, toggleMediaKeys, togglePreventSleep, toggleViewMode, loadSystemAccentColor, applyAccentColor,
     }
 })
