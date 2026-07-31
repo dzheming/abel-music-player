@@ -24,12 +24,14 @@ export function useAudioEffects() {
     invoke('get_setting', { key: 'audio-effects' }).then(v => {
         if (v) {
             const saved = JSON.parse(v as string)
-            if (saved.playbackSpeed != null) playbackSpeed.value = saved.playbackSpeed
-            if (saved.stereoBalance != null) stereoBalance.value = saved.stereoBalance
-            if (saved.reverbMix != null) reverbMix.value = saved.reverbMix
-            if (saved.bassBoost != null) bassBoost.value = saved.bassBoost
-            if (saved.vocalBoost != null) vocalBoost.value = saved.vocalBoost
-            applyAll()
+            if (saved && typeof saved === 'object') {
+                if (typeof saved.playbackSpeed === 'number') playbackSpeed.value = saved.playbackSpeed
+                if (typeof saved.stereoBalance === 'number') stereoBalance.value = saved.stereoBalance
+                if (typeof saved.reverbMix === 'number') reverbMix.value = saved.reverbMix
+                if (typeof saved.bassBoost === 'number') bassBoost.value = saved.bassBoost
+                if (typeof saved.vocalBoost === 'number') vocalBoost.value = saved.vocalBoost
+                applyAll()
+            }
         }
     }).catch(() => {})
 

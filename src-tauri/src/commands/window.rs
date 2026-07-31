@@ -16,7 +16,6 @@ pub struct WindowState {
     pub y: i32,
     pub width: u32,
     pub height: u32,
-    pub maximized: bool,
 }
 
 fn state_file_path() -> PathBuf {
@@ -27,18 +26,8 @@ fn state_file_path() -> PathBuf {
 pub fn save_window_state(app: AppHandle) -> Result<(), String> {
     let window = app.get_webview_window("main").ok_or("Window not found")?;
 
-    let is_maximized = window.is_maximized().unwrap_or(false);
-
-    if is_maximized {
-        let path = state_file_path();
-        if path.exists() {
-            let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-            if let Ok(mut state) = serde_json::from_str::<WindowState>(&json) {
-                state.maximized = true;
-                let json = serde_json::to_string(&state).map_err(|e| e.to_string())?;
-                fs::write(&path, json).map_err(|e| e.to_string())?;
-            }
-        }
+    // 最大化时不保存，保留上次正常状态的尺寸
+    if window.is_maximized().unwrap_or(false) {
         return Ok(());
     }
 
@@ -50,7 +39,6 @@ pub fn save_window_state(app: AppHandle) -> Result<(), String> {
         y: position.y,
         width: size.width,
         height: size.height,
-        maximized: false,
     };
 
     let json = serde_json::to_string(&state).map_err(|e| e.to_string())?;
@@ -68,31 +56,41 @@ pub fn restore_window_state(app: AppHandle) -> Result<(), String> {
     let json = fs::read_to_string(&path).map_err(|e| e.to_string())?;
     let state: WindowState = serde_json::from_str(&json).map_err(|e| e.to_string())?;
 
-    let valid = monitor_contains_position(state.x, state.y)
-        || monitor_contains_position(state.x + state.width as i32, state.y)
-        || monitor_contains_position(state.x, state.y + state.height as i32)
-        || monitor_contains_position(state.x + state.width as i32, state.y + state.height as i32);
-    
+    // 使用真实显示器信息校验位置，避免硬编码范围误判左侧/上方副屏
+    let monitors = app.available_monitors().unwrap_or_default();
+    let valid = is_position_in_monitors(&monitors, state.x, state.y)
+        || is_position_in_monitors(&monitors, state.x + state.width as i32, state.y)
+        || is_position_in_monitors(&monitors, state.x, state.y + state.height as i32)
+        || is_position_in_monitors(&monitors, state.x + state.width as i32, state.y + state.height as i32);
 
     let window = app.get_webview_window("main").ok_or("Window not found")?;
 
     if valid {
-        use tauri::{LogicalPosition, LogicalSize};
-        window.set_position(LogicalPosition::new(state.x as f64, state.y as f64)).map_err(|e| e.to_string())?;
-        window.set_size(LogicalSize::new(state.width as f64, state.height as f64)).map_err(|e| e.to_string())?;
-    
+        // 保存时使用 outer_position/outer_size 返回物理像素，恢复时也用物理坐标保持一致
+        use tauri::{PhysicalPosition, PhysicalSize};
+        window.set_position(PhysicalPosition::new(state.x, state.y)).map_err(|e| e.to_string())?;
+        window.set_size(PhysicalSize::new(state.width, state.height)).map_err(|e| e.to_string())?;
     }
 
     Ok(())
 }
 
-/// 显示器最大坐标值 (覆盖多屏 16K 分辨率场景)
-const MAX_MONITOR_DIMENSION: i32 = 16384;
 /// 允许窗口略微超出屏幕边界仍视为有效位置
 const OFFSCREEN_MARGIN: i32 = 200;
 
-fn monitor_contains_position(x: i32, y: i32) -> bool {
-    x >= -OFFSCREEN_MARGIN && x < MAX_MONITOR_DIMENSION && y >= -OFFSCREEN_MARGIN && y < MAX_MONITOR_DIMENSION
+fn is_position_in_monitors(monitors: &[tauri::Monitor], x: i32, y: i32) -> bool {
+    monitors.iter().any(|m| {
+        let pos = m.position();
+        let size = m.size();
+        let mx = pos.x;
+        let my = pos.y;
+        let mw = size.width as i32;
+        let mh = size.height as i32;
+        x >= mx - OFFSCREEN_MARGIN
+            && x < mx + mw + OFFSCREEN_MARGIN
+            && y >= my - OFFSCREEN_MARGIN
+            && y < my + mh + OFFSCREEN_MARGIN
+    })
 }
 
 #[tauri::command]

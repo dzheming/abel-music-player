@@ -72,7 +72,7 @@ onUnmounted(() => {
 .app-layout {
     display: grid;
     grid-template-columns: var(--sidebar-width) 1fr;
-    grid-template-rows: 32px 1fr var(--player-bar-height);
+    grid-template-rows: var(--title-bar-height) 1fr var(--player-bar-height);
     height: 100vh;
     overflow: hidden;
 }

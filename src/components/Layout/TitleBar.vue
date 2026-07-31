@@ -43,7 +43,7 @@ async function close() {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    height: 32px;
+    height: var(--title-bar-height);
     padding-left: 12px;
     background-color: var(--color-bg-sidebar);
     border-bottom: 1px solid var(--color-border);

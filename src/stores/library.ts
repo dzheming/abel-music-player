@@ -73,10 +73,15 @@ export const useLibraryStore = defineStore('library', () => {
         useBrowseStore().refresh()
     }
 
+    function normalizePath(p: string): string {
+        return p.replace(/\\/g, '/')
+    }
+
     async function removeFolder(path: string) {
         await invoke('remove_library_folder', { path })
         const playerStore = usePlayerStore()
-        if (playerStore.currentTrack?.path.startsWith(path)) {
+        const normPath = normalizePath(path)
+        if (playerStore.currentTrack && normalizePath(playerStore.currentTrack.path).startsWith(normPath)) {
             playerStore.stop()
             playerStore.setPlaylist([], 0)
         }
@@ -88,7 +93,7 @@ export const useLibraryStore = defineStore('library', () => {
 
         folders.value = await invoke('get_library_folders')
         folderTrees.value.delete(path)
-        if (selectedFolderPath.value?.startsWith(path)) {
+        if (selectedFolderPath.value && normalizePath(selectedFolderPath.value).startsWith(normPath)) {
             if (folders.value.length > 0) {
                 await selectFolder(folders.value[0].path)
             } else {
@@ -103,7 +108,8 @@ export const useLibraryStore = defineStore('library', () => {
     async function excludeFolder(path: string) {
         await invoke('exclude_folder', { path })
         const playerStore = usePlayerStore()
-        if (playerStore.currentTrack?.path.startsWith(path)) {
+        const normPath = normalizePath(path)
+        if (playerStore.currentTrack && normalizePath(playerStore.currentTrack.path).startsWith(normPath)) {
             playerStore.stop()
             playerStore.setPlaylist([], 0)
         }
@@ -114,13 +120,13 @@ export const useLibraryStore = defineStore('library', () => {
         }
 
         // Reload folder trees
-        const rootFolder = folders.value.find(f => path.startsWith(f.path))
+        const rootFolder = folders.value.find(f => normPath.startsWith(normalizePath(f.path)))
         if (rootFolder) {
             const tree: LibraryFolderNode = await invoke('get_folder_tree', { rootPath: rootFolder.path })
             folderTrees.value.set(rootFolder.path, tree)
         }
 
-        if (selectedFolderPath.value?.startsWith(path)) {
+        if (selectedFolderPath.value && normalizePath(selectedFolderPath.value).startsWith(normPath)) {
             if (rootFolder) {
                 await selectFolder(rootFolder.path)
             } else if (folders.value.length > 0) {
@@ -136,7 +142,8 @@ export const useLibraryStore = defineStore('library', () => {
 
     async function restoreFolder(path: string) {
         await invoke('restore_folder', { path })
-        const rootFolder = folders.value.find(f => path.startsWith(f.path))
+        const normPath = normalizePath(path)
+        const rootFolder = folders.value.find(f => normPath.startsWith(normalizePath(f.path)))
         if (rootFolder) {
             await syncAndLoadTree(rootFolder.path)
         }
@@ -191,7 +198,7 @@ export const useLibraryStore = defineStore('library', () => {
                     if (myGen !== scanGeneration) return
                     await invoke('cache_tracks', { tracks: metadataList })
                     if (myGen !== scanGeneration) return
-                    if (selectedFolderPath.value?.startsWith(folder.path)) {
+                    if (selectedFolderPath.value && normalizePath(selectedFolderPath.value).startsWith(normalizePath(folder.path))) {
                         await loadFromCache(selectedFolderPath.value)
                     }
                 }
@@ -306,7 +313,8 @@ export const useLibraryStore = defineStore('library', () => {
         if (files.length === 0) return
         const metadataList: RawTrack[] = await invoke('read_metadata_batch', { paths: files })
         await invoke('cache_tracks', { tracks: metadataList })
-        if (selectedFolderPath.value?.startsWith(path)) {
+        const normPath = normalizePath(path)
+        if (selectedFolderPath.value && normalizePath(selectedFolderPath.value).startsWith(normPath)) {
             await loadFromCache(selectedFolderPath.value)
         }
         useBrowseStore().refresh()

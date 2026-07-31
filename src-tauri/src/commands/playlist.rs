@@ -51,7 +51,7 @@ pub fn delete_playlist(id: i64, state: tauri::State<'_, DbState>) -> Result<(), 
 #[tauri::command]
 pub fn rename_playlist(id: i64, name: String, state: tauri::State<'_, DbState>) -> Result<(), String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    conn.execute("UPDATE playlists SET name = ?1 WHERE ID = ?2", params![name, id])
+    conn.execute("UPDATE playlists SET name = ?1 WHERE id = ?2", params![name, id])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -93,7 +93,7 @@ pub fn add_to_playlist(playlist_id: i64, paths: Vec<String>, state: tauri::State
     let mut pos = max_pos + 1;
     let mut added: u64 = 0;
     for path in &paths {
-        let n= tx.execute(
+        let n = tx.execute(
             "INSERT OR IGNORE INTO playlist_tracks (playlist_id, path, position) VALUES (?1, ?2, ?3)",
             params![playlist_id, path, pos]
         ).map_err(|e| e.to_string())?;

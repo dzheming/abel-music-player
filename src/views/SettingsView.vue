@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { getVersion } from '@tauri-apps/api/app'
 import { useSettingsStore } from '../stores/settings'
 import { useLibraryStore } from '../stores/library'
 import { useBrowseStore } from '../stores/browse'
@@ -10,6 +11,16 @@ const settingsStore = useSettingsStore()
 const libraryStore = useLibraryStore()
 const browseStore = useBrowseStore()
 const playlistStore = usePlaylistStore()
+
+const appVersion = ref('')
+
+onMounted(async () => {
+    try {
+        appVersion.value = await getVersion()
+    } catch {
+        appVersion.value = ''
+    }
+})
 
 const isRefreshing = ref(false)
 const refreshError = ref('')
@@ -127,7 +138,7 @@ async function refreshLibrary() {
             <div class="setting-item">
                 <div class="setting-info">
                     <span class="setting-label">Abel Music Player</span>
-                    <span class="setting-desc">版本 0.1.0</span>
+                    <span class="setting-desc" v-if="appVersion">版本 {{ appVersion }}</span>
                 </div>
             </div>
         </div>

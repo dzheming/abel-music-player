@@ -70,7 +70,7 @@ async fn try_lrclib(client: &reqwest::Client, title: &str, artist: &str, album: 
 
     let response = client
         .get(&url)
-        .header("User-Agent", "AbelMusicPlayer/0.1.0")
+        .header("User-Agent", &format!("AbelMusicPlayer/{}", env!("CARGO_PKG_VERSION")))
         .send()
         .await
         .ok()?;
@@ -95,7 +95,7 @@ async fn try_lrclib(client: &reqwest::Client, title: &str, artist: &str, album: 
 
     let response = client
         .get(&search_url)
-        .header("User-Agent", "AbelMusicPlayer/0.1.0")
+        .header("User-Agent", &format!("AbelMusicPlayer/{}", env!("CARGO_PKG_VERSION")))
         .send()
         .await
         .ok()?;
@@ -170,28 +170,24 @@ async fn try_netease(client: &reqwest::Client, title: &str, artist: &str, album:
         name_match && artist_match && album_match
     });
 
-    // if matched.is_some() {
-    //     let s = matched.unwrap();
-    //     eprintln!("try_netease exact matched: name {:?} artist {:?} album {:?}",
-    //         s.get("name").and_then(|v| v.as_str()),
-    //         s.get("artists").and_then(|a| a.as_array()).and_then(|arr| arr.first()).and_then(|a| a.get("name")).and_then(|v| v.as_str()),
-    //         s.get("album").and_then(|a| a.get("name")).and_then(|v| v.as_str()),
-    //     );
-    // }
-
     let matched = matched.or_else(|| {
         if album.is_empty() { return None; }
-        
+
         songs.iter().find(|song| {
-            song.get("album")
-            .and_then(|a| a.get("name"))
-            .and_then(|n| n.as_str())
-            .filter(|n| !n.is_empty())
-            .map(|n| {
-                let n_lower = n.to_lowercase();
-                n_lower.contains(&album_lower) || album_lower.contains(&n_lower)
-            })
-            .unwrap_or(false)
+            let name_match = song.get("name")
+                .and_then(|n| n.as_str())
+                .map(|n| n.to_lowercase() == title_lower)
+                .unwrap_or(false);
+            let album_match = song.get("album")
+                .and_then(|a| a.get("name"))
+                .and_then(|n| n.as_str())
+                .filter(|n| !n.is_empty())
+                .map(|n| {
+                    let n_lower = n.to_lowercase();
+                    n_lower.contains(&album_lower) || album_lower.contains(&n_lower)
+                })
+                .unwrap_or(false);
+            name_match && album_match
         })
     });
     let song = matched.or_else(|| songs.first())?;

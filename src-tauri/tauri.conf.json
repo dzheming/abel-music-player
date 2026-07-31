@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Abel Music Player",
-  "version": "0.1.0",
+  "version": "../package.json",
   "identifier": "com.abel.music.player",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self'; img-src 'self' data:; media-src 'self' asset: https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' ipc: http://ipc.localhost",
       "assetProtocol" : {
         "enable": true,
         "scope": ["**"]

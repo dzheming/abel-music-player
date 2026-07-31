@@ -62,7 +62,7 @@ const groupedFiles = computed<GroupedFiles[]>(() => {
     let currentGroup: GroupedFiles | null = null
 
     displayFiles.value.forEach((file, index) => {
-        const dir = file.path.replace(/[/\\][^/\\]+$/, '')
+        const dir = file.path.replace(/[/\\][^/\\]+$/, '') || '(根目录)'
         if (dir !== currentDir) {
             currentDir = dir
             currentGroup = { dir, files: [] }
@@ -145,9 +145,11 @@ function scrollToPlaying(smooth = false) {
 
 async function locatePlaying(smooth: boolean) {
     if (activeTab.value !== 'library' || !playerStore.currentTrack) return
+    const normPath = (p: string) => p.replace(/\\/g, '/')
     const trackDir = playerStore.currentTrack.path.replace(/[/\\][^/\\]+$/, '')
-    if (libraryStore.selectedFolderPath && !trackDir.startsWith(libraryStore.selectedFolderPath)) {
-        const parentFolder = libraryStore.folders.find(f => trackDir.startsWith(f.path))
+    const normTrackDir = normPath(trackDir)
+    if (libraryStore.selectedFolderPath && !normTrackDir.startsWith(normPath(libraryStore.selectedFolderPath))) {
+        const parentFolder = libraryStore.folders.find(f => normTrackDir.startsWith(normPath(f.path)))
         if (parentFolder) {
             await libraryStore.selectFolder(trackDir)
         }
@@ -155,7 +157,6 @@ async function locatePlaying(smooth: boolean) {
     nextTick(() => scrollToPlaying(smooth))
 }
 
-// watch(() => playerStore.currentTrack?.path, () => locatePlaying(true))
 watch(activeTab, () => locatePlaying(false))
 
 const onPlayerViewClosed = () => locatePlaying(false)

@@ -9,17 +9,23 @@ let analyser: AnalyserNode | null = null
 let accentColor = '#0a84ff'
 
 let accentObserver: MutationObserver | null = null
+let intersectionObserver: IntersectionObserver | null = null
 
 function refreshAccentColor() {
     accentColor = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || '#0a84ff'
 }
 
-onMounted(() => {
+function ensureAnalyser() {
+    if (analyser) return true
     try {
         analyser = playerStore.getAnalyser()
-    } catch (e) {
-        console.error('Failed to init analyser: ', e)
+        return true
+    } catch {
+        return false
     }
+}
+
+onMounted(() => {
     refreshAccentColor()
     accentObserver = new MutationObserver(() => refreshAccentColor())
     accentObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
@@ -37,8 +43,6 @@ onMounted(() => {
         intersectionObserver.observe(canvasRef.value)
     }
 })
-
-let intersectionObserver: IntersectionObserver | null = null
 
 onUnmounted(() => {
     if (animationId) {
@@ -58,7 +62,7 @@ onUnmounted(() => {
 function draw() {
     animationId = requestAnimationFrame(draw)
 
-    if (!canvasRef.value || !analyser) return
+    if (!canvasRef.value) return
 
     const canvas = canvasRef.value
     const width = canvas.clientWidth
@@ -77,9 +81,28 @@ function draw() {
     ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0)
     ctx.clearRect(0, 0, width, height)
 
-    const bufferLength = analyser.frequencyBinCount
+    // analyser 未就绪时绘制空闲态中线
+    if (!ensureAnalyser()) {
+        ctx.fillStyle = accentColor
+        ctx.globalAlpha = 0.25
+        const barWidth = 3
+        const gap = 3
+        const midY = height / 2
+        const total = Math.floor(width / (barWidth + gap))
+        for (let i = 0; i < total; i++) {
+            const x = i * (barWidth + gap)
+            ctx.fillRect(x, midY - 1, barWidth, 2)
+        }
+        ctx.globalAlpha = 1
+        return
+    }
+
+    const a = analyser
+    if (!a) return
+
+    const bufferLength = a.frequencyBinCount
     const dataArray = new Uint8Array(bufferLength)
-    analyser.getByteFrequencyData(dataArray)
+    a.getByteFrequencyData(dataArray)
 
     const startX = width * 0.04
     const availableWidth = width * 0.96

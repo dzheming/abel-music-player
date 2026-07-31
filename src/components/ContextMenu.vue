@@ -18,6 +18,8 @@ const emit = defineEmits<{ close: [] }>()
 const menuRef = ref<HTMLElement | null>(null)
 const expandedIndex = ref<number | null>(null)
 const submenuLeft = ref(false)
+const adjustedLeft = ref(props.x)
+const adjustedTop = ref(props.y)
 
 function handleClick(item: MenuItem) {
     if (item.children) {
@@ -49,6 +51,16 @@ function onClickOutside(e: MouseEvent) {
 
 onMounted(() => {
     document.addEventListener('mousedown', onClickOutside)
+    nextTick(() => {
+        if (!menuRef.value) return
+        const rect = menuRef.value.getBoundingClientRect()
+        if (rect.right > window.innerWidth) {
+            adjustedLeft.value = Math.max(0, window.innerWidth - rect.width - 4)
+        }
+        if (rect.bottom > window.innerHeight) {
+            adjustedTop.value = Math.max(0, window.innerHeight - rect.height - 4)
+        }
+    })
 })
 
 onUnmounted(() => {
@@ -58,7 +70,7 @@ onUnmounted(() => {
 
 <template>
     <Teleport to="body">
-        <div ref="menuRef" class="context-menu" :style="{ left: props.x + 'px', top: props.y + 'px' }">
+        <div ref="menuRef" class="context-menu" :style="{ left: adjustedLeft + 'px', top: adjustedTop + 'px' }">
             <div
                 v-for="(item, index) in props.items"
                 :key="item.label"

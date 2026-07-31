@@ -119,7 +119,7 @@ async function randomPlay() {
         const paths = tracks.map(t => t.path)
         await playlistStore.addToPlaylist(defaultId, paths)
 
-        playerStore.shuffle = true
+        if (!playerStore.shuffle) playerStore.toggleShuffle()
         playerStore.setPlaylist(tracks.map(toTrack), 0)
 
         if (playlistStore.currentPlaylistId !== defaultId) {

@@ -132,8 +132,15 @@ export const usePlayerStore = defineStore('player', () => {
                 const track = playlist.value[state.currentIndex]
                 if (track) {
                     audio.src = convertFileSrc(track.path)
-                    audio.currentTime = state.currentTime
-                    currentTime.value = state.currentTime
+                    const restoreTime = state.currentTime
+                    clearRestoreListener()
+                    const onLoadedMeta = () => {
+                        audio.currentTime = restoreTime
+                        currentTime.value = restoreTime
+                        clearRestoreListener()
+                    }
+                    restoreMetaListener = onLoadedMeta
+                    audio.addEventListener('loadedmetadata', onLoadedMeta)
                     invoke<string | null>('read_cover', { path: track.path }).then(cover => {
                         if (cover && playlist.value[state.currentIndex]) {
                             playlist.value[state.currentIndex].coverUrl = cover
@@ -154,12 +161,21 @@ export const usePlayerStore = defineStore('player', () => {
     }
 
     let fadeOutTimer: ReturnType<typeof setTimeout> | null = null
+    let restoreMetaListener: (() => void) | null = null
+
+    function clearRestoreListener() {
+        if (restoreMetaListener) {
+            audio.removeEventListener('loadedmetadata', restoreMetaListener)
+            restoreMetaListener = null
+        }
+    }
 
     function playTrackAt(index: number) {
         if (index < 0 || index >= playlist.value.length) return
         initAudioContext()
 
         if (fadeOutTimer) { clearTimeout(fadeOutTimer); fadeOutTimer = null }
+        clearRestoreListener()
 
         const wasPlaying = isPlaying.value && audio.src
         const startNewTrack = () => {
@@ -242,7 +258,13 @@ export const usePlayerStore = defineStore('player', () => {
         if (playlist.value.length === 0) return
         let nextIdx: number
         if (shuffle.value) {
-            nextIdx = Math.floor(Math.random() * playlist.value.length)
+            if (playlist.value.length === 1) {
+                nextIdx = 0
+            } else {
+                do {
+                    nextIdx = Math.floor(Math.random() * playlist.value.length)
+                } while (nextIdx === currentIndex.value)
+            }
         } else {
             nextIdx = (currentIndex.value + 1) % playlist.value.length
         }
@@ -253,7 +275,13 @@ export const usePlayerStore = defineStore('player', () => {
         if (playlist.value.length === 0) return
         let prevIdx: number
         if (shuffle.value) {
-            prevIdx = Math.floor(Math.random() * playlist.value.length)
+            if (playlist.value.length === 1) {
+                prevIdx = 0
+            } else {
+                do {
+                    prevIdx = Math.floor(Math.random() * playlist.value.length)
+                } while (prevIdx === currentIndex.value)
+            }
         } else {
             prevIdx = (currentIndex.value - 1 + playlist.value.length) % playlist.value.length
         }
@@ -263,6 +291,7 @@ export const usePlayerStore = defineStore('player', () => {
     function seek(fraction: number) {
         if (duration.value > 0) {
             audio.currentTime = fraction * duration.value
+            currentTime.value = audio.currentTime
         }
     }
 
@@ -287,9 +316,11 @@ export const usePlayerStore = defineStore('player', () => {
         } else if (loopMode.value === LoopMode.RepeatAll) {
             next()
         } else {
+            // None 模式：shuffle 下持续随机播放（等价 RepeatAll 的随机版），
+            // 顺序播放时播完最后一首停止
             if (shuffle.value) {
                 next()
-            }else if (currentIndex.value < playlist.value.length - 1) {
+            } else if (currentIndex.value < playlist.value.length - 1) {
                 next()
             } else {
                 isPlaying.value = false

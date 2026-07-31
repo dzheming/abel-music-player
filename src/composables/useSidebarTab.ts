@@ -1,9 +1,11 @@
-import { ref } from 'vue'
+import { useUiStore } from '../stores/ui'
 
-export type SidebarTab = 'library' | 'playlist' | 'browse'
-
-const activeTab = ref<SidebarTab>('library')
+export type { SidebarTab } from '../stores/ui'
 
 export function useSidebarTab() {
-    return { activeTab }
+    const uiStore = useUiStore()
+    return {
+        activeTab: uiStore.activeTab,
+        setActiveTab: uiStore.setActiveTab
+    }
 }

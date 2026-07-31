@@ -72,8 +72,15 @@ pub fn cache_tracks(tracks: Vec<TrackMetadata>, state: tauri::State<'_, DbState>
     let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     for track in &tracks {
         tx.execute(
-            "INSERT OR REPLACE INTO track_cache (path, file_name, title, artist, album, duration, track_number)
-            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            "INSERT INTO track_cache (path, file_name, title, artist, album, duration, track_number)
+            VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            ON CONFLICT(path) DO UPDATE SET
+                file_name = excluded.file_name,
+                title = excluded.title,
+                artist = excluded.artist,
+                album = excluded.album,
+                duration = excluded.duration,
+                track_number = excluded.track_number",
             params![track.path, track.file_name, track.title, track.artist, track.album, track.duration, track.track_number]
         ).map_err(|e| e.to_string())?;
     }

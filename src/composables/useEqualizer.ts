@@ -21,7 +21,12 @@ export function useEqualizer() {
     const eqPreset = ref('默认')
 
     invoke('get_setting', { key: 'eq-gains' }).then(v => {
-        if (v) eqGains.value = JSON.parse(v as string)
+        if (v) {
+            const saved = JSON.parse(v as string)
+            if (Array.isArray(saved) && saved.length === EQ_FREQUENCIES.length) {
+                eqGains.value = saved
+            }
+        }
     }).catch(() => {})
     invoke('get_setting', { key: 'eq-enabled' }).then(v => {
         if (v) eqEnabled.value = v !== 'false'
