@@ -1,7 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Abel Music Player",
-  "version": "../package.json",
   "identifier": "com.abel.music.player",
   "build": {
     "beforeDevCommand": "npm run dev",
