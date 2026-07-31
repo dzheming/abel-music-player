@@ -19,7 +19,6 @@ interface SavedPlayState {
 
 export const usePlayerStore = defineStore('player', () => {
     const audio = new Audio()
-    audio.crossOrigin = 'anonymous'
     const playlist = ref<Track[]>([])
     const currentIndex = ref(-1)
     const isPlaying = ref(false)
