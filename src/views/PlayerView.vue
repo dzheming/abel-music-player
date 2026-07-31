@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, nextTick } from 'vue'
 import PlayerLayout from '../components/Layout/PlayerLayout.vue'
 import CoverDisplay from '../components/Display/CoverDisplay.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
@@ -17,9 +17,13 @@ function updateLyricsHeight() {
 
 onMounted(() => {
     nextTick(updateLyricsHeight)
+})
+onActivated(() => {
     window.addEventListener('resize', updateLyricsHeight)
 })
-
+onDeactivated(() => {
+    window.removeEventListener('resize', updateLyricsHeight)
+})
 onUnmounted(() => {
     window.removeEventListener('resize', updateLyricsHeight)
 })

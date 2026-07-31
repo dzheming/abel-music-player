@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onActivated, onDeactivated, onUnmounted } from 'vue'
 import PlayerLayout from '../components/Layout/PlayerLayout.vue'
 import LyricsDisplay from '../components/Lyrics/LyricsDisplay.vue'
 
@@ -17,9 +17,14 @@ function updateTime() {
 
 onMounted(() => {
     updateTime()
-    timer = setInterval(updateTime, 1000)
 })
-
+onActivated(() => {
+    updateTime()
+    if (!timer) timer = setInterval(updateTime, 1000)
+})
+onDeactivated(() => {
+    if (timer) { clearInterval(timer); timer = null }
+})
 onUnmounted(() => {
     if (timer) clearInterval(timer)
 })

@@ -65,7 +65,11 @@ onUnmounted(() => {
         <PlayerBar class="app-player-bar" @open-player="openPlayerView"/>
     </div>
 
-    <component :is="playerViewComponent" v-if="showPlayerView" @close="closePlayerView" />
+    <template v-if="showPlayerView">
+        <KeepAlive>
+            <component :is="playerViewComponent" @close="closePlayerView" />
+        </KeepAlive>
+    </template>
 </template>
 
 <style scoped>
