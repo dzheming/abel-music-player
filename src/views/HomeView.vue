@@ -151,7 +151,7 @@ async function locatePlaying(smooth: boolean) {
     if (libraryStore.selectedFolderPath && !normTrackDir.startsWith(normPath(libraryStore.selectedFolderPath))) {
         const parentFolder = libraryStore.folders.find(f => normTrackDir.startsWith(normPath(f.path)))
         if (parentFolder) {
-            await libraryStore.selectFolder(trackDir)
+            await libraryStore.selectFolder(parentFolder.path)
         }
     }
     nextTick(() => scrollToPlaying(smooth))

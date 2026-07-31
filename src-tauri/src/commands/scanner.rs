@@ -3,9 +3,7 @@ use walkdir::WalkDir;
 
 use super::database::DbState;
 use super::library::{get_excluded_folders_from_db, normalize_path};
-use super::AUDIO_EXTENSIONS;
-
-const MAX_SCAN_DEPTH: usize = 32;
+use super::{AUDIO_EXTENSIONS, MAX_SCAN_DEPTH};
 
 fn is_excluded(path: &str, excluded: &[String]) -> bool {
     let norm = normalize_path(path);

@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use super::AUDIO_EXTENSIONS;
 use super::database::DbState;
+use super::MAX_SCAN_DEPTH;
 
 pub fn normalize_path(path: &str) -> String {
     path.replace('\\', "/")
@@ -245,7 +246,7 @@ fn sync_folder_tree_inner(conn: &Connection, root_path: &str) -> Result<(), Stri
     drop(stmt);
 
     let mut disk_folders: Vec<(String, String, Option<String>, i64)> = Vec::new();
-    scan_dirs_recursive(std::path::Path::new(root_path), None, &excluded, &mut disk_folders);
+    scan_dirs_recursive(std::path::Path::new(root_path), None, &excluded, &mut disk_folders, 0);
 
     let mut stmt = conn.prepare(
         "SELECT path, excluded FROM library_folders WHERE path LIKE ?1 OR path = ?2"
@@ -300,7 +301,12 @@ fn scan_dirs_recursive(
     parent: Option<&str>,
     excluded: &[String],
     results: &mut Vec<(String, String, Option<String>, i64)>,
+    depth: usize,
 ) -> i64 {
+    if depth > MAX_SCAN_DEPTH {
+        return 0;
+    }
+
     if !dir.exists() || !dir.is_dir() {
         return 0;
     }
@@ -319,10 +325,17 @@ fn scan_dirs_recursive(
 
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.filter_map(|e| e.ok()) {
+            let file_type = match entry.file_type() {
+                Ok(ft) => ft,
+                Err(_) => continue,
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
             let entry_path = entry.path();
-            if entry_path.is_dir() {
-                audio_count += scan_dirs_recursive(&entry_path, Some(&path_str), excluded, results);
-            } else if entry_path.is_file() && is_audio_file(&entry_path) {
+            if file_type.is_dir() {
+                audio_count += scan_dirs_recursive(&entry_path, Some(&path_str), excluded, results, depth + 1);
+            } else if file_type.is_file() && is_audio_file(&entry_path) {
                 audio_count += 1;
             }
         }
