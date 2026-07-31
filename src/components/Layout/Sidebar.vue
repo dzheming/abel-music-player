@@ -10,10 +10,10 @@ import BrowseView from '../../views/BrowseView.vue'
 const libraryStore = useLibraryStore()
 const router = useRouter()
 const searchInput = ref('')
-const { activeTab, setActiveTab } = useSidebarTab()
+const { activeTab } = useSidebarTab()
 
 function switchTab(tab: 'library' | 'playlist' | 'browse') {
-    setActiveTab(tab)
+    activeTab.value = tab
     if (router.currentRoute.value.path !== '/') {
         router.push('/')
     }
