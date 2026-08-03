@@ -70,19 +70,19 @@ onUnmounted(() => {
 .time-hours {
     flex: 1;
     text-align: right;
-    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
+    -webkit-box-reflect: below -0.35em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .time-colon {
     font-weight: 100;
     padding: 0 0.2em;
-    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
+    -webkit-box-reflect: below -0.35em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .time-minutes {
     flex: 1;
     text-align: left;
-    -webkit-box-reflect: below -0.3em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
+    -webkit-box-reflect: below -0.35em linear-gradient(transparent 40%, rgba(255, 255, 255, 0.2));
 }
 
 .lyrics-section {
