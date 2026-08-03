@@ -45,7 +45,7 @@ const playerStore = usePlayerStore()
     grid-template-columns: 2fr 3fr;
     min-height: 0;
     padding: 0 48px 24px;
-    gap: 48px;
+    gap: 12px;
 }
 
 .split-left {
@@ -57,7 +57,7 @@ const playerStore = usePlayerStore()
 .vinyl-wrapper {
     align-self: end;
     justify-self: center;
-    width: min(100%, calc(100vh - 320px));
+    width: min(80%, calc(100vh - 320px));
     max-width: 480px;
     aspect-ratio: 1 / 1;
 }

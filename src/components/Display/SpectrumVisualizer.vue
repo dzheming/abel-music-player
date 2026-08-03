@@ -81,21 +81,10 @@ function draw() {
     ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0)
     ctx.clearRect(0, 0, width, height)
 
-    // analyser 未就绪时绘制空闲态中线
-    if (!ensureAnalyser()) {
-        ctx.fillStyle = accentColor
-        ctx.globalAlpha = 0.25
-        const barWidth = 3
-        const gap = 3
-        const midY = height / 2
-        const total = Math.floor(width / (barWidth + gap))
-        for (let i = 0; i < total; i++) {
-            const x = i * (barWidth + gap)
-            ctx.fillRect(x, midY - 1, barWidth, 2)
-        }
-        ctx.globalAlpha = 1
-        return
-    }
+    // 仅在播放时渲染频谱
+    if (!playerStore.isPlaying) return
+
+    if (!ensureAnalyser()) return
 
     const a = analyser
     if (!a) return

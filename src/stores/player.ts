@@ -131,8 +131,12 @@ export const usePlayerStore = defineStore('player', () => {
 
     function togglePlay() {
         if (!audio.src) return
-        if (audio.paused) audio.play().catch(e => console.error('play() failed:', e, 'src:', audio.src))
-        else audio.pause()
+        if (audio.paused) {
+            audioGraph.init(audio, eq, effects)
+            audio.play().catch(e => console.error('play() failed:', e, 'src:', audio.src))
+        } else {
+            audio.pause()
+        }
     }
 
     function stop() {
