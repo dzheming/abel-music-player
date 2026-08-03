@@ -57,7 +57,7 @@ async function selectResult(item: SearchResult) {
         if (lrc) {
             emit('select', lrc)
         } else {
-            error.value = '该歌曲暂无歌词'
+            error.value = `该歌曲暂无歌词 (ID: ${item.id})`
         }
     } catch (e: any) {
         error.value = '获取歌词失败: ' + (e?.toString() || '未知错误')
@@ -95,12 +95,13 @@ function onOverlayClick(e: MouseEvent) {
                         <label>歌手</label>
                         <input v-model="searchArtist" @keyup.enter="doSearch" placeholder="歌手名称" />
                     </div>
-                    <button class="search-btn" :disabled="isSearching" @click="doSearch">
-                        {{ isSearching ? '搜索中...' : '搜索' }}
-                    </button>
+                    <div class="search-actions">
+                        <span class="dialog-error">{{ error }}</span>
+                        <button class="search-btn" :disabled="isSearching" @click="doSearch">
+                            {{ isSearching ? '搜索中...' : '搜索' }}
+                        </button>
+                    </div>
                 </div>
-
-                <div v-if="error" class="dialog-error">{{ error }}</div>
 
                 <div class="dialog-results">
                     <div v-if="results.length === 0 && !isSearching" class="results-empty">
@@ -142,7 +143,7 @@ function onOverlayClick(e: MouseEvent) {
 
 .lyrics-search-dialog {
     width: 480px;
-    max-height: 70vh;
+    height: 70vh;
     background: var(--color-bg-primary);
     border-radius: var(--radius-lg, 12px);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
@@ -221,8 +222,16 @@ function onOverlayClick(e: MouseEvent) {
     border-color: var(--color-accent);
 }
 
+.search-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 28px;
+}
+
 .search-btn {
-    align-self: flex-end;
+    flex-shrink: 0;
     padding: 6px 16px;
     font-size: 13px;
     background: var(--color-accent);
@@ -242,10 +251,12 @@ function onOverlayClick(e: MouseEvent) {
 }
 
 .dialog-error {
-    padding: 8px 20px;
-    font-size: 12px;
+    font-size: 13px;
     color: #e53935;
-    flex-shrink: 0;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .dialog-results {

@@ -100,6 +100,7 @@ const menuItems = computed<MenuItem[]>(() => {
                 >
                     <span class="track-index">{{ index + 1 }}</span>
                     <span class="track-title">{{ track.title || stripExtension(track.fileName) }}</span>
+                    <span class="track-album">{{ track.album || '' }}</span>
                     <span class="track-duration">{{ formatTime(track.duration ?? 0) }}</span>
                 </div>
             </div>
@@ -123,6 +124,20 @@ const menuItems = computed<MenuItem[]>(() => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.track-item {
+    grid-template-columns: 32px 1fr 120px 40px;
+}
+
+.track-album {
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+    max-width: 160px;
 }
 
 .track-item.playing {
