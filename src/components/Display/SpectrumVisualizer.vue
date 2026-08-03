@@ -135,9 +135,7 @@ function draw() {
         const y = height - barHeight
 
         ctx.globalAlpha = 0.5 + (dataArray[i] / 255) * 0.5
-        ctx.beginPath()
-        ctx.roundRect(x, y, barWidth, barHeight, 2)
-        ctx.fill()
+        ctx.fillRect(x, y, barWidth, barHeight)
     }
 
     // 绘制峰值帽(短横线)
