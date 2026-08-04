@@ -61,9 +61,10 @@ onUnmounted(() => {
 .main-row {
     flex: 80;
     display: grid;
-    grid-template-columns: 31fr 69fr;
+    padding: 0 48px;
+    grid-template-columns: 2fr 3fr;
     grid-template-rows: auto 1fr;
-    align-items: start;
+    align-items: center;
     gap: 16px 1px;
     min-height: 0;
     position: relative;

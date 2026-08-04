@@ -97,6 +97,6 @@ const dynamicBackground = computed(() => {
 
 .floating-cover :deep(.cover-display) {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    -webkit-box-reflect: none;
+    -webkit-box-reflect: unset !important;
 }
 </style>

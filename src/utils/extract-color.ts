@@ -109,7 +109,7 @@ export function extractDominantColorCancelable(imageUrl: string): CancelableColo
             const avgR = Math.round(best.r / best.count)
             const avgG = Math.round(best.g / best.count)
             const avgB = Math.round(best.b / best.count)
-            const [r, g, b] = complementaryWithMinLightness(avgR, avgG, avgB, 0.6)
+            const [r, g, b] = complementaryWithMinLightness(avgR, avgG, avgB, 0.9)
             resolve(`#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`)
         }
         img.onerror = () => resolve(null)
